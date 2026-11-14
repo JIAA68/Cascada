@@ -1,9 +1,9 @@
-"""Movilidad en tiempo real: trenes de viajeros y tráfico (decisión del 08-11-2026).
+"""Movilidad en tiempo real: trenes de viajeros y tráfico.
 
 Tres fuentes abiertas, sin clave, que se consultan bajo demanda y se guardan un rato en memoria:
 
 - Trenes de viajeros de Renfe (GTFS-Realtime, CC BY 4.0): posición de cada tren, cada 30 s.
-  Activos dinámicos (decisión del 30-10-2026): no se estima cuántas personas llevan.
+  Activos dinámicos: no se estima cuántas personas llevan.
 - Tráfico de la ciudad de Madrid (Ayuntamiento de Madrid, portal de datos abiertos): nivel de
   servicio de unos 3.600 puntos de medida, cada 5 min. Solo cubre el municipio de Madrid.
 - Incidencias de la DGT (punto de acceso nacional, DATEX II): obras, cortes, accidentes y

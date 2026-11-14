@@ -1,4 +1,4 @@
-"""Mapa de combustibles forestales de la Comunidad de Madrid, rasterizado a 25 m (decisión del 08-11-2026).
+"""Mapa de combustibles forestales de la Comunidad de Madrid, rasterizado a 25 m.
 
 Fuente: geoportal IDEM de la Comunidad, «Mapa de Modelos de Combustibles» (servicio WFS
 ZonasRiesgo:BOPC_MODELOS_COMBUSTIBLES): 433.681 polígonos en EPSG:25830 elaborados a partir de LiDAR,

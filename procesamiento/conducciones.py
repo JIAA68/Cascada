@@ -1,4 +1,4 @@
-"""Eje de las conducciones de hidrocarburos para el mapa de crisis (decisión del 11-11-2026).
+"""Eje de las conducciones de hidrocarburos para el mapa de crisis.
 
 La Comunidad publica los tramos de conducciones de la BTA sin geometría, y el catálogo solo da la franja de
 peligrosidad de la capa 6_12, trazada alrededor de gasoductos y oleoductos: la conducción va hacia el centro de su

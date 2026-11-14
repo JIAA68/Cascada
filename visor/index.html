@@ -24,7 +24,32 @@
   <main>
     <div id="mapa">
       <button id="plegar-panel" type="button" title="Ocultar el panel lateral" aria-controls="panel" aria-expanded="true">›</button>
-      <div id="movilidad-leyenda" hidden></div>
+      <!-- Ficha de la celda de 1 km o del activo (análisis basal): ventana arriba a la izquierda con su botón Cerrar -->
+      <div id="ficha-mapa" role="dialog" aria-label="Ficha" hidden>
+        <p class="acciones"><button id="ficha-cerrar" type="button">Cerrar</button></p>
+        <section id="ficha"></section>
+      </div>
+      <!-- Buscador de municipios: arriba en el centro del mapa, en los tres modos -->
+      <div id="buscador" role="search">
+        <input id="buscador-texto" type="search" placeholder="Buscar municipio…" aria-label="Buscar municipio"
+          autocomplete="off" role="combobox" aria-expanded="false" aria-controls="buscador-lista">
+        <ul id="buscador-lista" role="listbox" hidden></ul>
+      </div>
+      <!-- Resumen de los datos al arrancar: centrado sobre el mapa, se cierra con su botón
+           y no vuelve a abrirse. Lleva también la leyenda de trenes y tráfico, que antes flotaba arriba a la izquierda -->
+      <div id="datos-inicio" role="dialog" aria-labelledby="datos-inicio-titulo">
+        <h2 id="datos-inicio-titulo">Datos del visor</h2>
+        <p class="ayuda-inicio">Haz clic en el mapa para ver los riesgos de la <strong>celda de 1 km</strong>, o en un activo para ver los suyos. Enciende capas y activos en el panel derecho.</p>
+        <div class="columnas">
+          <div><section id="datos-activos"><p class="meta">Cargando los activos…</p></section></div>
+          <div>
+            <section id="datos-capas"></section>
+            <section id="datos-poblacion"><p class="meta">Consultando la población…</p></section>
+            <section id="movilidad-leyenda" hidden></section>
+          </div>
+        </div>
+        <p class="acciones"><button id="datos-inicio-cerrar" type="button">Cerrar</button></p>
+      </div>
       <div id="cronologia-mapa" hidden></div>
       <div id="esalert-mapa" hidden>
         <div class="barra"><span>ES-Alert</span><span id="esalert-mapa-hora"></span></div>
@@ -43,7 +68,6 @@
           <select id="rep-camara" title="Movimiento de la cámara durante la reproducción">
             <option value="fija" selected>Cámara fija</option>
             <option value="clave">Seguir sucesos clave</option>
-            <option value="todos">Seguir todos los sucesos</option>
           </select>
           <label class="rep-pausa" title="Parar la reproducción al alcanzar una instalación Seveso, una conducción o un centro de vulnerabilidad muy alta"><input type="checkbox" id="rep-pausa" checked> Pausar en sucesos clave</label>
           <span id="rep-reloj" class="reloj"></span>
@@ -64,11 +88,11 @@
     <aside id="panel">
       <details id="elementos" open>
         <summary>Elementos del mapa</summary>
-        <label class="elemento" title="Mostrar u ocultar los nombres del mapa"><input type="checkbox" id="ver-nombres" checked> Nombres</label>
+        <label class="elemento" title="Mostrar u ocultar los nombres del mapa"><input type="checkbox" id="ver-nombres"> Nombres</label>
         <label class="elemento" title="Trenes de viajeros en tiempo real (Renfe)"><input type="checkbox" id="ver-trenes"> Trenes</label>
         <label class="elemento" title="Tráfico en tiempo real (Ayuntamiento de Madrid y DGT)"><input type="checkbox" id="ver-trafico"> Tráfico</label>
       </details>
-      <!-- Capas de peligrosidad y activos: comunes a los tres modos (decisión del 09-11-2026) -->
+      <!-- Capas de peligrosidad y activos: comunes a los tres modos -->
       <details id="capas-peligrosidad" open>
         <summary>Capas de peligrosidad</summary>
         <div id="capas"></div>
@@ -76,15 +100,12 @@
       </details>
       <details id="activos-panel" open>
         <summary>Activos</summary>
-        <label class="grupo"><input type="checkbox" id="ver-activos" checked> Todos</label>
+        <label class="grupo"><input type="checkbox" id="ver-activos"> Todos</label>
         <div id="familias"></div>
       </details>
-      <div id="panel-basal">
-        <section id="ayuda">
-          <p>Haz clic en el mapa para ver los riesgos de la <strong>celda de 1 km</strong>, o en un activo para ver los suyos.</p>
-        </section>
-        <section id="ficha" hidden></section>
-      </div>
+      <!-- La ficha de la celda y del activo va en una ventana sobre el mapa y la ayuda, en «Datos del visor»
+          : en el panel derecho, solo los selectores -->
+      <div id="panel-basal"></div>
 
       <div id="panel-prealerta" hidden>
         <section>
@@ -132,12 +153,6 @@
             <p><button id="simular" type="button" class="principal">Simular la evolución (24 h)</button></p>
             <p id="estado"></p>
           </div>
-        </section>
-        <section id="validacion">
-          <h2>Validación con un caso real</h2>
-          <p>Incendio de Tres Cantos, 11 de agosto de 2025: la simulación con el viento medido, frente al perímetro final de Copernicus EFFIS y los focos de satélite de NASA FIRMS.</p>
-          <p><button id="ver-validacion" type="button">Cargar el caso de Tres Cantos (2025)</button></p>
-          <p id="validacion-estado"></p>
         </section>
         <section id="resultado" hidden></section>
         <section id="comunicaciones" hidden>

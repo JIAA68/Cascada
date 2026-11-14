@@ -17,33 +17,32 @@ let alerta = null, marcador = null, focos = [];
 let sim = null, llegada = null, lienzo = null, dibujo = null, pixeles = null;
 let t = 0, minutoPintado = -1, reproduciendo = false, ultimoCuadro = 0;
 let afectadosBase = [];   // cosas afectadas según la simulación; movilidad.js añade trenes y tráfico
-// Avisos anticipados (decisión del 11-11-2026): globo con cuenta atrás y flecha por la ruta del fuego para los
-// centros de vulnerabilidad alta y muy alta, desde 3 h antes de la llegada; los 3 más próximos a la vez; al llegar,
-// el globo se pone rojo con la hora y se apaga a los 30 minutos simulados.
-// Desde el 12-11-2026, el mismo globo para todos los avisos (centros, carreteras, vías de tren, núcleos de población,
-// instalaciones Seveso y conducción), y para todos los centros que alcanza el fuego, de cualquier vulnerabilidad (la
-// flecha, solo en los de alta y muy alta, que traen la ruta): los 5 más próximos a la vez, de cualquier tipo.
+// Avisos anticipados: globo con cuenta atrás para todo lo que alcanzará el fuego (centros de cualquier vulnerabilidad,
+// carreteras, vías de tren, núcleos de población, instalaciones Seveso y conducción), desde 3 h antes de la llegada;
+// los 5 más próximos a la vez, de cualquier tipo, y las instalaciones Seveso y la conducción, además, fuera de ese
+// cupo. Flecha por la ruta del fuego solo en los centros de vulnerabilidad alta y muy alta, que traen la ruta. Al
+// llegar, el globo se pone rojo con la hora y se apaga a los 30 minutos simulados.
 const AVISO = { antelacion_min: 180, simultaneos: 5, permanencia_min: 30, urgente_min: 60 };
-// La animación arranca solo con la ignición (decisión del 13-11-2026): en las 3 primeras horas, avisos e isocronas miran
+// La animación arranca solo con la ignición: en las 3 primeras horas, avisos e isocronas miran
 // tan lejos como tiempo lleva el incendio (en el minuto 10, lo que llega antes del 20), y desde ahí, 3 horas
 const antelacion = (minuto, maximo) => Math.min(maximo, minuto);
 let avisos = [];
 const globos = new Map();
-// Cronología de sucesos (decisión del 11-11-2026): los últimos 5 sobre el mapa y la lista completa en el panel, con
+// Cronología de sucesos: los últimos 5 sobre el mapa y la lista completa en el panel, con
 // tipos seleccionables, marcas en la barra de tiempo, pausa en los sucesos clave (Seveso y conducciones alcanzadas,
 // centros de vulnerabilidad muy alta) y cámara fija, que sigue los sucesos clave o que sigue todos.
 const TIPOS_SUCESO = { municipios: "Municipios y poblaciones", centros: "Centros alcanzados", cascada: "Seveso y conducciones",
   vias: "Carreteras y trenes de Cercanías", otros: "Trenes y tráfico ahora, y humo sobre centros" };
 const tiposActivos = new Set(["municipios", "centros", "cascada", "vias"]);
-// Carreteras y vías de tren (decisión del 11-11-2026): gris bajo el humo, rojo con el fuego a menos de 250 m. Sin
-// pistas forestales (decisión del 12-11-2026)
+// Carreteras y vías de tren: gris bajo el humo, rojo con el fuego a menos de 250 m. Sin
+// pistas forestales
 const NUNCA_MIN = 1e9;
-// Cascada animada (decisión del 11-11-2026): flecha del frente a la instalación Seveso o la conducción en la hora antes
+// Cascada animada: flecha del frente a la instalación Seveso o la conducción en la hora antes
 // de alcanzarla; al alcanzarla, pulso y zonas que crecen desde ella en 2 s reales; flechas a los centros de
 // vulnerabilidad alta y muy alta de sus zonas durante 30 minutos simulados; esquema de la cadena en el panel.
 const CASCADA = { duracion_ms: 2000, aproximacion_min: 60, flechas_min: 30, naranja: "#d9772b" };
 let origenesCascada = [], minutoCascada = -1;
-// Isocronas (decisión del 11-11-2026): hasta dónde habrá llegado el fuego a cada hora en punto de las 3 siguientes,
+// Isocronas: hasta dónde habrá llegado el fuego a cada hora en punto de las 3 siguientes,
 // con la hora del reloj; la próxima, más marcada, y las siguientes, más tenues.
 const ISOCRONAS_MIN = 180;
 const animando = new Map();
@@ -60,9 +59,10 @@ document.addEventListener("mapa-listo", () => {
     paint: { "fill-color": ["match", ["get", "zona"], "intervención", "#ff7f00", "#ffd000"], "fill-opacity": 0.22 } }, "activos-grupos");
   mapa.addLayer({ id: "seveso-bordes", type: "line", source: "seveso-zonas", filter: ["<=", ["get", "minutos"], -1],
     paint: { "line-color": "#c65a00", "line-width": 1.5, "line-dasharray": [3, 2] } }, "activos-grupos");
-  // Cada cosa afectada aparece en el mapa al llegarle el fuego, la zona Seveso o el humo (decisión del 12-11-2026): los
+  // Cada cosa afectada aparece en el mapa al llegarle el fuego, la zona Seveso o el humo: los
   // centros, con su propio símbolo; estaciones, trenes y tráfico, con un punto del color del efecto; carreteras y
-  // municipios, sin marca (la carretera ya cambia de color). El nombre, del color del efecto, hasta el final; la casilla
+  // municipios, sin marca (la carretera ya cambia de color). El nombre, del color del efecto, hasta el final (si choca con
+// otro de más prioridad, se oculta hasta que haya sitio); la casilla
   // «Nombres» lo apaga (app.js).
   mapa.addLayer({ id: "afectados", type: "symbol", source: "afectados", filter: ["<=", ["get", "minutos"], -1],
     layout: { "icon-image": ["concat", "activo-", ["get", "subtipo"]], "icon-size": 1.15, "icon-allow-overlap": true, "icon-ignore-placement": true } });
@@ -72,7 +72,9 @@ document.addEventListener("mapa-listo", () => {
     layout: { "text-field": ["get", "nombre"], "text-size": ["case", ["==", ["get", "clase"], "municipio"], 13, 11.5],
       "text-font": ["Open Sans Semibold"], "text-max-width": 14,
       "text-variable-anchor": ["left", "right", "top", "bottom"], "text-radial-offset": 0.9, "symbol-sort-key": ["get", "orden"],
-      "text-allow-overlap": true, "text-ignore-placement": true },   // todos los nombres, aunque se pisen
+      // Nombres que chocan: se oculta el de menor prioridad según "orden" (poblaciones,
+      // Seveso y conducción; fuego antes que amenaza derivada y humo; mayor vulnerabilidad primero) y reaparece al acercarse
+      "text-allow-overlap": false, "text-ignore-placement": false },
     paint: { "text-color": ["get", "color"], "text-halo-color": "#fff", "text-halo-width": 2 } });
   mapa.addSource("vias", { type: "geojson", data: vacioFC() });
   const sinDato = (campo) => ["coalesce", ["get", campo], NUNCA_MIN];
@@ -100,7 +102,7 @@ document.addEventListener("mapa-listo", () => {
     paint: { "fill-color": "#ff7f00", "fill-opacity": 0.2 } }, "activos-grupos");
   mapa.addLayer({ id: "conduccion-borde", type: "line", source: "conduccion-franja", filter: ["<=", ["get", "minutos"], -1],
     paint: { "line-color": "#c65a00", "line-width": 1.5, "line-dasharray": [3, 2] } }, "activos-grupos");
-  // Conducciones de hidrocarburos (decisión del 11-11-2026): solo la línea, siempre visible en los tres modos. Es el eje
+  // Conducciones de hidrocarburos: solo la línea, siempre visible en los tres modos. Es el eje
   // del núcleo de la capa 6_12, calculado en la cadena de datos (procesamiento/conducciones.py)
   mapa.addSource("conducciones", { type: "geojson", data: "/datos/conducciones.geojson" });
   mapa.addLayer({ id: "conducciones", type: "line", source: "conducciones", layout: { "line-join": "round", "line-cap": "round" },
@@ -135,7 +137,8 @@ document.addEventListener("mapa-listo", () => {
     paint: { "line-color": ["coalesce", ["get", "color"], "#d1121b"], "line-width": 3, "line-dasharray": [2, 1.2] } });
   mapa.addLayer({ id: "aviso-puntas", type: "symbol", source: "aviso-puntas",
     layout: { "icon-image": ["coalesce", ["get", "icono"], "punta-aviso"], "icon-size": 1.1, "icon-rotate": ["get", "rumbo"], "icon-rotation-alignment": "map",
-      "icon-allow-overlap": true, "icon-ignore-placement": true } });
+      // La punta se retrasa unos píxeles por la propia línea para que el símbolo del centro no la tape
+      "icon-offset": [0, 14], "icon-allow-overlap": true, "icon-ignore-placement": true } });
   mapa.addLayer({ id: "cascada-puntas", type: "symbol", source: "cascada-puntas", filter: ["<=", ["get", "minutos"], -1],
     layout: { "icon-image": "punta-cascada", "icon-size": 1, "icon-rotate": ["get", "rumbo"], "icon-rotation-alignment": "map",
       "icon-allow-overlap": true, "icon-ignore-placement": true } });
@@ -256,7 +259,7 @@ function circulo(lon, lat, radioM, pasos = 64) {
   return { type: "Polygon", coordinates: [anillo] };
 }
 
-// Zona de humo en el minuto t (decisión del 13-11-2026): la que calcula el servidor cada pocos minutos, la misma con la
+// Zona de humo en el minuto t: la que calcula el servidor cada pocos minutos, la misma con la
 // que marca los centros, carreteras y estaciones bajo el humo (procesamiento/incendio/humo.py)
 function zonaHumo(minuto) {
   let zona = null;
@@ -272,7 +275,8 @@ function cargarSimulacion(d, mapaLlegada, historico = false) {
   dibujo = lienzo.getContext("2d"); pixeles = dibujo.createImageData(columnas, filas);
   if (mapa.getLayer("fuego")) { mapa.removeLayer("fuego"); mapa.removeSource("fuego"); }
   mapa.addSource("fuego", { type: "canvas", canvas: lienzo, coordinates: esquinas, animate: true });
-  mapa.addLayer({ id: "fuego", type: "raster", source: "fuego", paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, "humo");
+  // Bordes suavizados al pintar: el cálculo sigue en celdas de 50 m, pero sin cuadrados
+  mapa.addLayer({ id: "fuego", type: "raster", source: "fuego", paint: { "raster-fade-duration": 0, "raster-resampling": "linear" } }, "humo");
 
   const zonas = [], destinos = [], horaCascada = (min) => hhmm(new Date(new Date(d.ignicion.hora).getTime() + min * 60000));
   const destino = (lon, lat, id, nombre, minutos) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] },
@@ -282,8 +286,7 @@ function cargarSimulacion(d, mapaLlegada, historico = false) {
       zonas.push({ type: "Feature", geometry: circulo(i.lon, i.lat, radio), properties: { zona, minutos: i.minutos, id: i.id } });
     destinos.push(destino(i.lon, i.lat, i.id, `Seveso ${i.id} · ${i.amenazas.join(", ")}`, i.minutos));
   }
-  const c = d.cascada.conduccion;
-  if (c) destinos.push(destino(c.lon, c.lat, "conducción", "Conducción de hidrocarburos", Math.round(c.primera_llegada_min * 10) / 10));
+  for (const tr of tramosConduccion(d)) destinos.push(destino(tr.lon, tr.lat, tr.id, "Conducción de hidrocarburos", Math.round(tr.minutos * 10) / 10));
   mapa.getSource("seveso-zonas").setData({ type: "FeatureCollection", features: zonas });
   mapa.getSource("cascada-destinos").setData({ type: "FeatureCollection", features: destinos });
   afectadosBase = cosasAfectadas(d);
@@ -349,11 +352,11 @@ function cosasAfectadas(d) {
   }
   // Núcleos de población, instalaciones Seveso y conducción alcanzados por el fuego
   for (const p of d.poblaciones || [])
-    lista.push(afectado(p.lon, p.lat, { clase: "poblacion", tipo: "llamas", minutos: p.minutos, nombre: `Población · ${p.nombre}`, punto: true, orden: -1 }));
+    lista.push(afectado(p.lon, p.lat, { clase: "poblacion", tipo: "llamas", minutos: p.minutos, nombre: `Núcleo (IGN) · ${p.nombre}`, punto: true, orden: -1 }));
   for (const i of d.cascada.instalaciones_seveso)
     lista.push(afectado(i.lon, i.lat, { clase: "seveso", tipo: "llamas", minutos: i.minutos, nombre: `Instalación Seveso · ${i.id}`, orden: -1 }));
-  const c = d.cascada.conduccion;
-  if (c) lista.push(afectado(c.lon, c.lat, { clase: "conduccion", tipo: "llamas", minutos: c.primera_llegada_min, nombre: "Conducción de hidrocarburos", orden: -1 }));
+  for (const tr of tramosConduccion(d))
+    lista.push(afectado(tr.lon, tr.lat, { clase: "conduccion", tipo: "llamas", minutos: tr.minutos, nombre: "Conducción de hidrocarburos", orden: -1 }));
   const tp = d.trenes_programados || { estaciones: [], trenes: [] };
   for (const e of tp.estaciones) {
     const lineas = [...new Set(tp.trenes.filter((t) => t.estacion === e.nombre).map((t) => t.linea))];
@@ -364,7 +367,7 @@ function cosasAfectadas(d) {
   return lista;
 }
 
-// Avisos en globo (decisión del 12-11-2026): todo lo que va a alcanzar el fuego, cada uno con su símbolo, en el punto
+// Avisos en globo: todo lo que va a alcanzar el fuego, cada uno con su símbolo, en el punto
 // por el que llega, con la cuenta atrás; los centros, además, con la flecha por la ruta del fuego
 const SIMBOLO_AVISO = {
   via: `<span class="linea-via" style="border-color:#d1121b"></span>`,
@@ -377,7 +380,7 @@ const SIMBOLO_AVISO = {
 const tipoVia = (r) => r.tipo === "carretera"
   ? ["Carretera", r.via === "Carreteras sin código" ? "sin código" : r.via] : [r.via.replace(/^Vías/, "Vía"), ""];
 const unir = (tipo, nombre) => nombre ? `${tipo} · ${nombre}` : tipo;
-// Color de la franja de la cartela según lo que es (decisión del 12-11-2026); el cuerpo, según la urgencia
+// Color de la franja de la cartela según lo que es; el cuerpo, según la urgencia
 const COLOR_CARTELA = { poblacion: "#5f5f5f", via: "#2b2b2b", cascada: CASCADA.naranja };
 function listaAvisos(d) {
   const dist = d.distancia_alcanzado_m, lista = [];
@@ -395,15 +398,27 @@ function listaAvisos(d) {
       alcanzado: (h) => `Fuego a menos de ${dist} m desde las ${h}: probable corte` });
   }
   for (const p of d.poblaciones || [])
-    lista.push({ id: `poblacion-${p.nombre}-${p.lon}`, tipo: "Población", nombre: p.nombre, color: COLOR_CARTELA.poblacion, minutos: p.minutos, lon: p.lon, lat: p.lat,
+    // «Núcleo (IGN)» y no «Población»: el Nomenclátor llama núcleo de población también a
+    // polígonos, bases, campings o instalaciones como «Iberdrola»
+    lista.push({ id: `poblacion-${p.nombre}-${p.lon}`, tipo: "Núcleo (IGN)", nombre: p.nombre, color: COLOR_CARTELA.poblacion, minutos: p.minutos, lon: p.lon, lat: p.lat,
       simbolo: SIMBOLO_AVISO.poblacion, alcanzado: (h) => `Fuego a menos de ${dist} m del casco desde las ${h}` });
   for (const i of d.cascada.instalaciones_seveso)
-    lista.push({ id: `seveso-${i.id}`, tipo: "Instalación Seveso", nombre: `${i.id} (${i.amenazas.join(", ")})`, color: COLOR_CARTELA.cascada, minutos: i.minutos, lon: i.lon, lat: i.lat,
-      simbolo: SIMBOLO_AVISO.seveso, alcanzado: (h) => `Alcanzada a las ${h}: se activan sus zonas` });
-  const c = d.cascada.conduccion;
-  if (c) lista.push({ id: "conduccion", tipo: "Conducción de hidrocarburos", nombre: "", color: COLOR_CARTELA.cascada, minutos: c.primera_llegada_min, lon: c.lon, lat: c.lat,
-    simbolo: SIMBOLO_AVISO.conduccion, alcanzado: (h) => `Alcanzada a las ${h}: se activa su franja de 750 m` });
+    lista.push({ id: `seveso-${i.id}`, tipo: "Instalación Seveso", nombre: `${i.id} · ${zonasSeveso(i).map((z) => `${AMENAZA_CORTA[z.amenaza] || z.amenaza} ${km(z.radio_alerta_m)}`).join(", ")}`, color: COLOR_CARTELA.cascada, minutos: i.minutos, lon: i.lon, lat: i.lat,
+      fuera_de_cupo: true, simbolo: SIMBOLO_AVISO.seveso, alcanzado: (h) => `Alcanzada a las ${h}: se activan sus zonas` });
+  for (const tr of tramosConduccion(d))
+    lista.push({ id: `conduccion-${tr.k}`, tipo: "Conducción de hidrocarburos", nombre: tr.k ? "otro tramo" : "", color: COLOR_CARTELA.cascada,
+      minutos: tr.minutos, lon: tr.lon, lat: tr.lat, fuera_de_cupo: true, simbolo: SIMBOLO_AVISO.conduccion,
+      alcanzado: (h) => tr.k ? `Alcanzado a las ${h}: se amplía la franja de 750 m` : `Alcanzada a las ${h}: se activa su franja de 750 m` });
   return lista;
+}
+
+// Tramos de la conducción que alcanza el fuego: la primera llegada y cada tramo nuevo, a más
+// de 1,5 km de lo ya alcanzado, con su aviso. Las simulaciones anteriores solo traen la primera llegada
+function tramosConduccion(d) {
+  const c = d.cascada.conduccion;
+  if (!c) return [];
+  const tramos = c.tramos && c.tramos.length ? c.tramos : [{ minutos: c.primera_llegada_min, lon: c.lon, lat: c.lat, ruta: c.ruta }];
+  return tramos.map((tr, k) => ({ ...tr, k, id: k ? `conducción ${k + 1}` : "conducción", ruta: tr.ruta || [] }));
 }
 
 // Trenes, incidencias y puntos de tráfico alcanzados (movilidad.js), junto a lo demás
@@ -434,10 +449,10 @@ function pintar(minuto) {
   const yaAfectado = ["<=", ["get", "minutos"], minuto];
   mapa.setFilter("afectados", ["all", yaAfectado, ["==", ["get", "clase"], "centro"]]);
   mapa.setFilter("afectados-punto", ["all", yaAfectado, ["==", ["get", "punto"], true]]);
-  // El nombre de todo lo afectado se queda hasta el final (decisión del 12-11-2026: todos, sin excepción)
+  // El nombre de todo lo afectado se queda hasta el final; si choca con otro, manda la prioridad
   mapa.setFilter("afectados-nombre", yaAfectado);
   // Punto de los destinos de la cascada: tenue hasta la hora previa a la llegada (el nombre y la hora van en su globo)
-  // Desde el 13-11-2026 aparece cuando entra en la vista del incendio (tanta antelación como tiempo lleva): la animación
+  // Aparece cuando entra en la vista del incendio (tanta antelación como tiempo lleva): la animación
   // arranca solo con la ignición, y la flecha de aproximación y su destino salen juntos
   const alcanzada = ["<=", ["get", "minutos"], minuto];
   mapa.setFilter("cascada-destinos-punto", ["<=", ["-", ["get", "minutos"], minuto], minuto]);
@@ -464,7 +479,7 @@ function pintar(minuto) {
   return quemadas * celda_m * celda_m / 1e6;
 }
 
-// Personas hasta un minuto (decisión del 13-11-2026): población del Censo 2021 de las celdas de 1 km que toca el
+// Personas hasta un minuto: población del Censo 2021 de las celdas de 1 km que toca el
 // fuego y plazas de los centros sociales alcanzados por las llamas
 function personasHasta(minuto, d = sim) {
   const r = { poblacion: 0, menores_16: 0, mayores_64: 0, plazas: 0 };
@@ -503,14 +518,20 @@ function prepararCascada(d, zonasSeveso) {
   if (c && c.franja) {
     for (const f of c.franja) for (const anillo of f.coords)
       franjas.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [anillo] }, properties: { id: "conducción", minutos: f.minutos, hasta: f.hasta } });
-    origenesCascada.push({ id: "conducción", lon: c.lon, lat: c.lat, minutos: c.primera_llegada_min, ruta: c.ruta || [],
-      zonas: franjas.filter((f) => f.properties.minutos === c.franja[0].minutos).map((f) => ({ ...f, properties: { ...f.properties, zona: "franja" } })) });
+    // Cada tramo alcanzado es un origen: flecha de aproximación y pulso; la franja que crece, solo con la primera llegada
+    for (const tr of tramosConduccion(d))
+      origenesCascada.push({ id: tr.id, lon: tr.lon, lat: tr.lat, minutos: tr.minutos, ruta: tr.ruta, conduccion: true,
+        zonas: tr.k ? [] : franjas.filter((f) => f.properties.minutos === c.franja[0].minutos).map((f) => ({ ...f, properties: { ...f.properties, zona: "franja" } })) });
   }
   mapa.getSource("conduccion-franja").setData({ type: "FeatureCollection", features: franjas });
-  // Flechas desde la instalación (o el punto alcanzado de la conducción) a los centros de alta y muy alta de sus zonas
+  // Flechas desde la instalación (o el punto alcanzado de la conducción) a los centros de alta y muy alta de sus zonas;
+  // en la conducción, desde el tramo ya alcanzado más cercano al centro
   const flechas = [], puntas = [];
+  const cerca = (a) => (o) => Math.hypot((o.lon - a.lon) * Math.cos((a.lat * Math.PI) / 180), o.lat - a.lat);
   for (const a of d.cascada.activos) {
-    const o = origenesCascada.find((x) => x.id === (a.origen === "conducción" ? "conducción" : a.origen));
+    const o = a.origen === "conducción"
+      ? origenesCascada.filter((x) => x.conduccion && x.minutos <= a.minutos + 0.1).sort((p, q) => cerca(a)(p) - cerca(a)(q))[0]
+      : origenesCascada.find((x) => x.id === a.origen);
     if (!o || !(a.vulnerabilidad === "alta" || a.vulnerabilidad === "muy_alta")) continue;
     const linea = [[o.lon, o.lat], [a.lon, a.lat]];
     flechas.push({ type: "Feature", geometry: { type: "LineString", coordinates: linea }, properties: { minutos: a.minutos } });
@@ -582,7 +603,8 @@ function esquemaCascada(d, horaDe) {
   for (const i of d.cascada.instalaciones_seveso)
     cadenas.push(`<div class="cadena" data-min="${i.minutos}"><span class="eslabon fuego">Fuego a las ${horaDe(i.minutos)}</span>${flecha}` +
       `<span class="eslabon instalacion"><strong>${html(i.id)}</strong> <small>${i.amenazas.map(html).join(", ")}</small></span>${flecha}` +
-      `<span class="eslabon zona">Intervención ${km(i.radio_intervencion_m)} <small>alerta ${km(i.radio_alerta_m)}</small></span>${flecha}${centros(i.id)}</div>`);
+      `<span class="eslabon zona">${zonasSeveso(i).map((z) => `${html(z.amenaza)}: intervención ${km(z.radio_intervencion_m)} ` +
+        `<small>alerta ${km(z.radio_alerta_m)}</small>`).join("<br>")}</span>${flecha}${centros(i.id)}</div>`);
   const c = d.cascada.conduccion;
   if (c) cadenas.push(`<div class="cadena" data-min="${c.primera_llegada_min}"><span class="eslabon fuego">Fuego a las ${horaDe(c.primera_llegada_min)}</span>${flecha}` +
     `<span class="eslabon instalacion"><strong>Conducción</strong> <small>de hidrocarburos</small></span>${flecha}` +
@@ -626,6 +648,17 @@ function seccionVias(d, horaDe) {
 
 // ----------------------------------------------------------------------------- cronología de sucesos
 const km = (m) => m < 1000 ? `${numero(m)} m` : `${(m / 1000).toLocaleString("es-ES", { maximumFractionDigits: 1 })} km`;
+// Zonas de cada amenaza de una instalación Seveso, de mayor a menor alcance. Cada amenaza tiene sus radios: la nube
+// tóxica puede llegar a kilómetros y la sobrepresión quedarse en decenas de metros. Las simulaciones guardadas sin
+// «zonas» dan los radios mayores de la instalación para todas sus amenazas.
+const zonasSeveso = (i) => i.zonas
+  || [{ amenaza: i.amenazas.join(", "), radio_intervencion_m: i.radio_intervencion_m, radio_alerta_m: i.radio_alerta_m }];
+const radiosSeveso = (i) => zonasSeveso(i).map((z) =>
+  `${html(z.amenaza)} (intervención ${km(z.radio_intervencion_m)}, alerta ${km(z.radio_alerta_m)})`).join("; ");
+// Nombre corto de cada amenaza Seveso, para que la cartela quepa en dos líneas
+const AMENAZA_CORTA = { "nube tóxica": "nube tóxica", "sobrepresión por explosión": "explosión", "radiación térmica": "radiación" };
+// Amenaza por la que un centro queda en una zona Seveso («zona de alerta por nube tóxica»); la conducción solo tiene una
+const porAmenaza = (a) => a.amenaza_derivada && a.origen !== "conducción" ? ` por ${html(a.amenaza_derivada)}` : "";
 const textoPlano = (s) => s.replace(/<[^>]+>/g, "");
 
 function construirSucesos(d) {
@@ -636,7 +669,7 @@ function construirSucesos(d) {
   for (const m of d.municipios) if (m.minutos > 0)
     lista.push({ min: m.minutos, tipo: "municipios", texto: `El fuego entra en <strong>${html(m.nombre)}</strong>`, lon: m.lon, lat: m.lat });
   for (const p of d.poblaciones || [])
-    lista.push({ min: p.minutos, tipo: "municipios", texto: `Fuego a menos de ${dist} m de <strong>Población · ${html(p.nombre)}</strong>`, lon: p.lon, lat: p.lat });
+    lista.push({ min: p.minutos, tipo: "municipios", texto: `Fuego a menos de ${dist} m del <strong>núcleo ${html(p.nombre)}</strong> (IGN)`, lon: p.lon, lat: p.lat });
   // Centros: uno a uno los de vulnerabilidad alta y muy alta; los demás, agrupados por hora
   const resto = [];
   for (const a of d.activos_llamas) {
@@ -650,17 +683,17 @@ function construirSucesos(d) {
   // Efecto cascada
   for (const i of d.cascada.instalaciones_seveso)
     lista.push({ min: i.minutos, tipo: "cascada", clave: true, lon: i.lon, lat: i.lat,
-      texto: `Alcanza la instalación Seveso <strong>${html(i.id)}</strong>: se activan su zona de intervención (${km(i.radio_intervencion_m)}) ` +
-        `y su zona de alerta (${km(i.radio_alerta_m)}) por ${i.amenazas.map(html).join(", ")}` });
+      texto: `Alcanza la instalación Seveso <strong>${html(i.id)}</strong>: se activan sus zonas de ${radiosSeveso(i)}` });
   for (const [origen, g] of agrupar(d.cascada.activos, (a) => a.origen)) {
     const ins = d.cascada.instalaciones_seveso.find((i) => i.id === origen) || g[0];
     const min = Math.min(...g.map((a) => a.minutos));
     lista.push({ min, tipo: "cascada", lon: ins.lon, lat: ins.lat, texto: g.length === 1
-      ? `${de(g[0])} queda en la zona de ${html(g[0].zona)} de ${html(origen)}` : `<strong>${g.length} centros</strong> quedan en las zonas de ${html(origen)}` });
+      ? `${de(g[0])} queda en la zona de ${html(g[0].zona)}${porAmenaza(g[0])} de ${html(origen)}` : `<strong>${g.length} centros</strong> quedan en las zonas de ${html(origen)}` });
   }
-  const c = d.cascada.conduccion;
-  if (c) lista.push({ min: c.primera_llegada_min, tipo: "cascada", clave: true, lon: c.lon, lat: c.lat,
-    texto: "Alcanza una <strong>conducción de hidrocarburos</strong>: se activa su franja de efectos en 750 m alrededor del tramo" });
+  for (const tr of tramosConduccion(d))
+    lista.push({ min: tr.minutos, tipo: "cascada", clave: true, lon: tr.lon, lat: tr.lat, texto: tr.k
+      ? "Alcanza <strong>otro tramo de la conducción de hidrocarburos</strong>: se amplía su franja de efectos en 750 m"
+      : "Alcanza una <strong>conducción de hidrocarburos</strong>: se activa su franja de efectos en 750 m alrededor del tramo" });
   // Carreteras y vías: el fuego, uno a uno; el humo, agrupado por minuto
   if (d.vias) {
     for (const r of d.vias.resumen) if (r.llamas != null)
@@ -732,7 +765,7 @@ function pintarCronologia() {
 }
 
 function actualizarCronologiaMapa(minuto) {
-  // De arriba abajo: el suceso más reciente, al final (decisión del 12-11-2026)
+  // De arriba abajo: el suceso más reciente, al final
   const ultimos = sucesosVisibles().filter((s) => s.min <= minuto).slice(-SUCESOS_EN_MAPA);
   const clave = ultimos.map((s) => `${s.min}${s.texto}`).join("|");
   if (clave === cronologiaPintada) return;
@@ -759,8 +792,11 @@ function rumboEntre([lon0, lat0], [lon1, lat1]) {
 
 function actualizarAvisos(minuto) {
   const hora0 = new Date(sim.ignicion.hora).getTime();
-  const vigentes = avisos.filter((a) => minuto >= a.minutos - antelacion(minuto, AVISO.antelacion_min) && minuto < a.minutos + AVISO.permanencia_min)
-    .sort((a, b) => a.minutos - b.minutos).slice(0, AVISO.simultaneos);
+  // Las instalaciones Seveso y la conducción tienen siempre su cartela, fuera del cupo de 5:
+  // disparan la cascada y, en zonas densas, lo más próximo llenaba el cupo y se quedaban sin aviso hasta ser alcanzadas
+  const enVentana = avisos.filter((a) => minuto >= a.minutos - antelacion(minuto, AVISO.antelacion_min) && minuto < a.minutos + AVISO.permanencia_min)
+    .sort((a, b) => a.minutos - b.minutos);
+  const vigentes = [...enVentana.filter((a) => a.fuera_de_cupo), ...enVentana.filter((a) => !a.fuera_de_cupo).slice(0, AVISO.simultaneos)];
   const ids = new Set(vigentes.map((a) => a.id));
   for (const [id, m] of globos) if (!ids.has(id)) { m.remove(); globos.delete(id); }
   const rutas = [], puntas = [];
@@ -787,8 +823,9 @@ function actualizarAvisos(minuto) {
       ? a.alcanzado(llega)
       : `Llega en ${duracion(a.minutos - minuto)} · hacia las ${llega}`;
     if (!alcanzado && a.ruta) {
-      // La flecha acaba donde el fuego alcanza el centro (a menos de 250 m), no en el propio centro, bajo el globo
-      const tramo = tramoPendiente(a.ruta.length > 2 ? a.ruta.slice(0, -1) : a.ruta, minuto);
+      // La flecha acaba en el propio centro: la ruta llega a la celda que arde antes a menos de 250 m y
+      // de ahí, en un último tramo, al centro; sin ese tramo, la punta quedaba a un lado y no apuntaba a nada
+      const tramo = tramoPendiente(a.ruta, minuto);
       if (tramo && tramo.length > 1) {
         rutas.push({ type: "Feature", geometry: { type: "LineString", coordinates: tramo }, properties: {} });
         puntas.push({ type: "Feature", geometry: { type: "Point", coordinates: tramo.at(-1) },
@@ -809,22 +846,24 @@ function actualizarAvisos(minuto) {
   colocarCartelas(minuto, vigentes, true);
 }
 
-// Cartelas fuera del fuego (decisión del 12-11-2026): cada cartela se aparta de su objetivo lo justo para quedar fuera
+// Cartelas fuera del fuego: cada cartela se aparta de su objetivo lo justo para quedar fuera
 // del área quemada (la de ahora y la de la media hora siguiente), sin pisar las demás cartelas, los objetivos ni los
 // paneles del mapa, preferiblemente del lado contrario al fuego; un conector la une al objetivo. Se mantiene donde
 // está mientras siga valiendo, para que no salte en cada minuto; al mover o acercar el mapa se recolocan todas.
 const CARTELA = { distancias: [30, 55, 85, 120, 170, 230, 300, 400], angulos: 16, margen: 10, paso: 9, antelacion_min: 30 };
 let cartelasVigentes = [];
 
-// Prueba en píxeles de pantalla: ¿hay fuego (llegada ≤ minuto) en este punto?
-function fuegoEnPantalla(minuto) {
+// Prueba en píxeles de pantalla: ¿hay fuego (desde < llegada ≤ minuto) en este punto?
+function fuegoEnPantalla(minuto, desde = -Infinity) {
   const { filas, columnas } = sim.ventana;
   const s0 = mapa.project(lonlat(0, 0)), s1 = mapa.project(lonlat(columnas, 0)), s2 = mapa.project(lonlat(0, filas));
   const ax = s1.x - s0.x, ay = s1.y - s0.y, bx = s2.x - s0.x, by = s2.y - s0.y, det = ax * by - ay * bx;
   return (x, y) => {
     const dx = x - s0.x, dy = y - s0.y;
     const col = Math.floor(((dx * by - dy * bx) / det) * columnas), fila = Math.floor(((ax * dy - ay * dx) / det) * filas);
-    return col >= 0 && fila >= 0 && col < columnas && fila < filas && llegada[fila * columnas + col] <= minuto;
+    if (col < 0 || fila < 0 || col >= columnas || fila >= filas) return false;
+    const v = llegada[fila * columnas + col];
+    return v <= minuto && v > desde;
   };
 }
 
@@ -834,7 +873,9 @@ function colocarCartelas(minuto, vigentes = cartelasVigentes, mantener = false) 
   if (!sim || modo !== "crisis" || !vigentes.length) return;
   const lienzoMapa = mapa.getContainer(), base = lienzoMapa.getBoundingClientRect();
   const ancho = lienzoMapa.clientWidth, alto = lienzoMapa.clientHeight;
-  const hayFuego = fuegoEnPantalla(minuto + CARTELA.antelacion_min);
+  // Las cartelas evitan el frente activo y lo que arde en la próxima media hora, pero pueden ir sobre lo ya quemado,
+  // para quedar cerca de su objetivo
+  const hayFuego = fuegoEnPantalla(minuto + CARTELA.antelacion_min, minuto - FRENTE_MIN);
   const solapa = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
   // Paneles sobre el mapa y los propios objetivos (un círculo de 12 px alrededor de cada uno)
   const ocupado = [...document.querySelectorAll("#cronologia-mapa, #esalert-mapa, #reproductor, #comunicaciones, .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left")]
@@ -859,6 +900,13 @@ function colocarCartelas(minuto, vigentes = cartelasVigentes, mantener = false) 
     }
     return false;
   };
+  // ¿Se cruzan dos conectores? (sin contar los extremos, por si dos objetivos están juntos)
+  const seCruzan = ([ax, ay, bx, by], [cx, cy, dx, dy]) => {
+    const giro = (px, py, qx, qy, rx, ry) => (qx - px) * (ry - py) - (qy - py) * (rx - px);
+    const d1 = giro(cx, cy, dx, dy, ax, ay), d2 = giro(cx, cy, dx, dy, bx, by);
+    const d3 = giro(ax, ay, bx, by, cx, cy), d4 = giro(ax, ay, bx, by, dx, dy);
+    return d1 * d2 < 0 && d3 * d4 < 0;
+  };
   vigentes.forEach((a, k) => {
     const caja = globos.get(a.id).getElement(), el = caja.querySelector(".globo-aviso"), p = puntos[k];
     const w = el.offsetWidth, h = el.offsetHeight, m = CARTELA.margen;
@@ -873,14 +921,16 @@ function colocarCartelas(minuto, vigentes = cartelasVigentes, mantener = false) 
       const fuera = r.x0 < 4 || r.y0 < 4 || r.x1 > ancho - 4 || r.y1 > alto - 4;
       const choques = ocupado.filter((o) => solapa(o, r)).length
         + conectores.filter((c) => cruza(c, r)).length              // la cartela no tapa conectores ya puestos
-        + cartelasPuestas.filter((o) => cruza(propio, o)).length;  // ni su conector cruza cartelas ya puestas
-      // Si no hay hueco libre: antes encima del fuego que de otra cartela, y nunca fuera del mapa
-      return { malo: (fuera ? 1000 : 0) + 100 * choques + Math.min(conFuego(r), 50), r, propio };
+        + cartelasPuestas.filter((o) => cruza(propio, o)).length   // ni su conector cruza cartelas ya puestas
+        + conectores.filter((c) => seCruzan(c, propio)).length;     // ni otros conectores
+      // Nunca fuera del mapa ni encima de otra cartela o panel; el fuego no lo impide, pero pesa: con viento
+      // fuerte el frente es tan ancho que, si se evitara del todo, la cartela quedaría muy lejos
+      return { malo: (fuera ? 1000 : 0) + 100 * choques, fuego: Math.min(conFuego(r), 200), r, propio };
     };
     let elegido = null;
     if (mantener && caja.dataset.dx != null) {
       const c = coste(+caja.dataset.dx, +caja.dataset.dy);
-      if (!c.malo) elegido = { dx: +caja.dataset.dx, dy: +caja.dataset.dy, r: c.r };
+      if (!c.malo && c.fuego < 15) elegido = { dx: +caja.dataset.dx, dy: +caja.dataset.dy, r: c.r };
     }
     if (!elegido) {
       let ux = p.x - centro.x, uy = p.y - centro.y;
@@ -896,10 +946,10 @@ function colocarCartelas(minuto, vigentes = cartelasVigentes, mantener = false) 
           const dx = Math.round(lim(cx * (w / 2 + d), 5 + m + w / 2 - p.x, ancho - 5 - m - w / 2 - p.x));
           const dy = Math.round(lim(cy * (h / 2 + d), 5 + m + h / 2 - p.y, alto - 5 - m - h / 2 - p.y));
           const c = coste(dx, dy);
-          const puntos_ = c.malo * 10000 + Math.hypot(dx, dy) + 80 * (1 - (cx * ux + cy * uy));
+          // Cerca del objetivo, del lado contrario al fuego y tapando poco frente (cada muestra de 9 px, 2 px de distancia)
+          const puntos_ = c.malo * 10000 + Math.hypot(dx, dy) + 80 * (1 - (cx * ux + cy * uy)) + 2 * c.fuego;
           if (!mejor || puntos_ < mejor.puntos) mejor = { dx, dy, r: c.r, puntos: puntos_ };
         }
-        if (mejor && mejor.puntos < 10000) break;   // la distancia más corta con algún hueco libre
       }
       elegido = mejor;
     }
@@ -926,7 +976,8 @@ function cuadro(ahora) {
   const pausa = $("#rep-pausa").checked ? cruzados.find((s) => s.clave) : undefined;
   fijarTiempo(pausa ? Math.ceil(pausa.min) : despues);   // el visor pinta minutos enteros: el suceso ya se ve
   const camara = $("#rep-camara").value;
-  const destino = camara === "todos" ? (pausa || cruzados.at(-1)) : camara === "clave" ? pausa : null;
+  // Cámara fija o siguiendo los sucesos clave
+  const destino = camara === "clave" ? pausa : null;
   if (destino && destino.lon != null)
     mapa.easeTo({ center: [destino.lon, destino.lat], zoom: Math.max(mapa.getZoom(), 12.5), duration: 1000 });
   if (pausa) { reproducir(false); return; }
@@ -965,9 +1016,10 @@ function mostrarResultado(d) {
     : `<p class="meta">Ninguno en 24 h.</p>`;
   const sens = (s) => s.centros ? `<p class="meta">Además, ${s.centros} centro${s.centros > 1 ? "s" : ""} de acogida o protección con ${numero(s.plazas)} plazas (no se muestran uno a uno).</p>` : "";
   const seveso = d.cascada.instalaciones_seveso.map((i) =>
-    `<li>Instalación Seveso <strong>${i.id}</strong>, alcanzada a las <strong>${horaDe(i.minutos)}</strong> (+${duracion(i.minutos)}): amenaza derivada de ${i.amenazas.join(", ")}; ` +
-    `zona de intervención de ${numero(i.radio_intervencion_m)} m y de alerta de ${numero(i.radio_alerta_m)} m.</li>`).join("");
-  const cond = d.cascada.conduccion ? `<li>Conducción de hidrocarburos alcanzada a las <strong>${horaDe(d.cascada.conduccion.primera_llegada_min)}</strong>: se activa su franja de efectos en 750 m alrededor del tramo.</li>` : "";
+    `<li>Instalación Seveso <strong>${i.id}</strong>, alcanzada a las <strong>${horaDe(i.minutos)}</strong> (+${duracion(i.minutos)}): amenaza derivada de ${radiosSeveso(i)}.</li>`).join("");
+  const otros = tramosConduccion(d).slice(1);
+  const cond = d.cascada.conduccion ? `<li>Conducción de hidrocarburos alcanzada a las <strong>${horaDe(d.cascada.conduccion.primera_llegada_min)}</strong>: se activa su franja de efectos en 750 m alrededor del tramo` +
+    (otros.length ? `; otro${otros.length > 1 ? "s" : ""} tramo${otros.length > 1 ? "s" : ""} a las ${otros.map((tr) => `<strong>${horaDe(tr.minutos)}</strong>`).join(", ")}` : "") + `.</li>` : "";
   $("#resultado").hidden = false;
   requestAnimationFrame(() => $("#resultado").scrollIntoView({ block: "start", behavior: "smooth" }));
   $("#resultado").innerHTML = `
@@ -982,8 +1034,8 @@ function mostrarResultado(d) {
       <span class="linea-via" style="border-color:#d1121b"></span>carretera o vía con fuego a menos de ${d.distancia_alcanzado_m} m
       <span class="linea-via" style="border-color:#5f5f5f"></span>bajo el humo
       <span class="linea-via isocrona"></span>hasta dónde llega el fuego en las próximas horas</p>
-    <p class="meta">Avisos: centros que alcanza el fuego, carreteras, vías de tren, poblaciones, instalaciones Seveso y la conducción
-      a los que llegará el fuego en las próximas 3 horas, con la cuenta atrás; los ${AVISO.simultaneos} más próximos a la vez. Una población, cuando el fuego llega a menos de ${d.distancia_alcanzado_m} m de su casco.</p>
+    <p class="meta">Avisos: centros que alcanza el fuego, carreteras, vías de tren, núcleos de población del IGN, instalaciones Seveso y la conducción
+      a los que llegará el fuego en las próximas 3 horas, con la cuenta atrás; los ${AVISO.simultaneos} más próximos a la vez, más las instalaciones Seveso y la conducción, que siempre tienen el suyo. Un núcleo, cuando el fuego llega a menos de ${d.distancia_alcanzado_m} m de su casco.</p>
     <p class="meta">Cada cosa alcanzada aparece en el mapa al llegarle el efecto, con su nombre, que se queda hasta el final:
       <span style="color:${COLOR_EFECTO.llamas};font-weight:600">fuego a menos de ${d.distancia_alcanzado_m} m</span>,
       <span style="color:${COLOR_EFECTO.derivada};font-weight:600">zona Seveso o de la conducción</span>,
@@ -1003,7 +1055,7 @@ function mostrarResultado(d) {
     <h3>Efecto cascada</h3>
     ${esquemaCascada(d, horaDe)}
     ${seveso || cond ? `<ul>${seveso}${cond}</ul>` : `<p class="meta">El fuego no alcanza instalaciones Seveso ni conducciones de hidrocarburos en 24 h.</p>`}
-    ${d.cascada.activos.length ? `<h4>Activos bajo amenaza derivada (${d.cascada.activos.length})</h4>${lista(d.cascada.activos, "derivada", (a) => `${html(a.origen)}, zona de ${html(a.zona)}`)}` : ""}${sens(d.cascada.sensibles)}
+    ${d.cascada.activos.length ? `<h4>Activos bajo amenaza derivada (${d.cascada.activos.length})</h4>${lista(d.cascada.activos, "derivada", (a) => `${html(a.origen)}, zona de ${html(a.zona)}${porAmenaza(a)}`)}` : ""}${sens(d.cascada.sensibles)}
     <h3>Activos bajo el humo (${d.humo.activos.length})</h3>
     <p class="meta">Cono viento abajo del área quemada, recalculado cada ${d.humo.parametros.paso_min} minutos (semiángulo ${d.humo.parametros.semiangulo_grados}°, hasta ${d.humo.parametros.alcance_max_km} km más allá del fuego).</p>
     ${lista(d.humo.activos, "humo")}${sens(d.humo.sensibles)}
@@ -1012,7 +1064,7 @@ function mostrarResultado(d) {
 }
 
 // ----------------------------------------------------------------------------- comunicaciones ficticias
-// ES-Alert (decisión del 13-11-2026): se emite al declarar la alerta y cada vez que crece el área del aviso (un municipio
+// ES-Alert: se emite al declarar la alerta y cada vez que crece el área del aviso (un municipio
 // entra en la próxima hora del fuego); el área son los municipios en los que el fuego ha entrado o entra en la hora
 // siguiente a la emisión. Sobre el mapa, con aspecto de aviso en un móvil, resaltado durante los primeros minutos.
 let emisionesAlerta = [0];
@@ -1048,70 +1100,9 @@ function comunicar(minuto, hora, km2) {
 }
 
 // ----------------------------------------------------------------------------- validación con un caso real
-// La simulación guardada del incendio de Tres Cantos (2025) se carga en el mismo reproductor, con el
-// perímetro final de EFFIS y los focos de satélite superpuestos, y una tabla que la compara con lo ocurrido.
+// El caso de Tres Cantos (2025) no se carga desde el visor: la validación se describe en la metodología. Las capas
+// del perímetro y los focos se quedan vacías.
 function limpiarValidacion() {
   for (const id of ["validacion-perimetro", "validacion-focos"]) if (mapa.getSource(id)) mapa.getSource(id).setData(vacioFC());
-  $("#validacion-estado").textContent = "";
 }
 
-const decimal = (x) => x.toLocaleString("es-ES", { maximumFractionDigits: 2 });
-const pct = (x) => `${x.toLocaleString("es-ES", { maximumFractionDigits: 1 })} %`;
-const RUMBOS16 = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
-const rumbo16 = (g) => RUMBOS16[Math.round(((g % 360) + 360) % 360 / 22.5) % 16];
-
-function compararConLoOcurrido(c) {
-  const m = c.metricas, r = c.referencias, mejor = m.mejor_hora, h = m.horizontes;
-  const ref = m.referencia_12_08_15h;
-  const viento0 = c.viento.por_hora.slice(0, 3).map((w) => `${decimal(w.velocidad_kmh)} km/h del ${rumbo(w.desde)}`).join(", ");
-  const fila = (que, real, simulado) => `<tr><th>${que}</th><td>${real}</td><td>${simulado}</td></tr>`;
-  const dirSim = m.direccion.simulada_24h_grados;
-  return `
-    <h2>Comparación con lo ocurrido</h2>
-    <p class="meta">${html(c.nombre)}. Inicio a las 19:45, según ${html(r.inicio.fuente)}. Punto de ignición estimado por el proyecto: no hay coordenadas oficiales publicadas.
-      Viento medido en la estación de ${html(c.viento.estacion)} de la Red de Calidad del Aire; en la primera hora, con la velocidad de la racha máxima del día registrada por AEMET;
-      en las tres primeras horas, ${viento0}. Humedad del combustible de la temperatura y la humedad del aire medidas, hora a hora. El fuego salta franjas sin combustible de hasta 300 m con viento fuerte; el modelo no incluye la extinción.</p>
-    <p class="leyenda-crisis"><span class="linea-validacion"></span>perímetro final (Copernicus EFFIS)
-      <span class="foco-validacion"></span>foco de satélite (NASA FIRMS), visible a su hora</p>
-    <table class="comparacion">
-      <thead><tr><th></th><th>Real</th><th>Simulado</th></tr></thead>
-      <tbody>
-        ${fila("Superficie final", `${numero(m.superficie_real_ha)} ha`, `${numero(h["24"].superficie_ha)} ha a las 24 h`)}
-        ${fila("Superficie a las 15:00 del 12-08", `más de ${numero(r.superficie_12_08_15h_ha.valor)} ha`, `${numero(ref.superficie_ha)} ha`)}
-        ${fila("Avance en los primeros 40 min", `más de ${r.avance_40_min_km.valor} km`, `${decimal(m.avance.distancia_max_40_min_km)} km`)}
-        ${fila("Dirección del avance, desde la ignición", `${rumbo16(m.direccion.real_grados)} (${Math.round(m.direccion.real_grados)}°); descrito como ${html(r.direccion.valor)}`,
-          dirSim == null ? "—" : `${rumbo16(dirSim)} (${Math.round(dirSim)}°) a las 24 h`)}
-        ${fila("Coincidencia con el perímetro", "—", `índice de Sørensen ${decimal(mejor.sorensen)} (a las ${mejor.hora} h)`)}
-        ${fila("Perímetro real alcanzado", "—", `${pct(mejor.real_quemado_pct)} a las ${mejor.hora} h; simulado fuera de él: ${pct(mejor.simulado_fuera_pct)}`)}
-        ${m.contencion ? fila(`Hasta las ${m.contencion.horas} h, ya perimetrado el real`, `${numero(m.superficie_real_ha)} ha`,
-          `${numero(m.contencion.superficie_ha)} ha; Sørensen ${decimal(m.contencion.sorensen)}; ${pct(m.contencion.real_quemado_pct)} del perímetro real alcanzado y ${pct(m.contencion.simulado_fuera_pct)} fuera de él` +
-          (m.contencion.rumbo_grados == null ? "" : `; avance hacia el ${rumbo16(m.contencion.rumbo_grados)} (${Math.round(m.contencion.rumbo_grados)}°)`)) : ""}
-        ${fila("Focos de satélite", `${m.focos.total} (${m.focos.dentro_del_perimetro} dentro del perímetro)`,
-          `${m.focos.dentro_de_lo_simulado} dentro del área simulada a su hora`)}
-      </tbody>
-    </table>`;
-}
-
-$("#ver-validacion").onclick = async () => {
-  $("#ver-validacion").disabled = true;
-  $("#validacion-estado").className = ""; $("#validacion-estado").textContent = "Cargando el caso…";
-  try {
-    const c = await consultar("/api/validacion");
-    const r = await fetch(c.simulacion.llegada_url);
-    if (!r.ok) throw new Error("falta el mapa de llegada de la simulación");
-    const mapaLlegada = await r.arrayBuffer();
-    reproducir(false);
-    alerta = null;
-    if (marcador) marcador.remove();
-    marcador = new maplibregl.Marker({ color: "#b3261e" }).setLngLat([c.ignicion.lon, c.ignicion.lat]).addTo(mapa);
-    cargarSimulacion(c.simulacion, new Uint16Array(mapaLlegada), true);
-    mapa.getSource("validacion-perimetro").setData({ type: "FeatureCollection", features: [c.perimetro] });
-    mapa.getSource("validacion-focos").setData(c.focos);
-    $("#resultado").insertAdjacentHTML("afterbegin", compararConLoOcurrido(c));
-    minutoPintado = -1;
-    fijarTiempo(t);
-    $("#validacion-estado").textContent = "";
-  } catch (e) {
-    $("#validacion-estado").className = "error"; $("#validacion-estado").textContent = `No se ha podido cargar el caso: ${e.message}`;
-  } finally { $("#ver-validacion").disabled = false; }
-};

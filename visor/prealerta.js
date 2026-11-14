@@ -1,4 +1,4 @@
-// Prealerta (decisiones del 08-11-2026): dónde está el riesgo focal en los próximos
+// Prealerta: dónde está el riesgo focal en los próximos
 // 7 días según la previsión de AEMET. El servidor cruza la previsión municipal (diaria a 7 días y horaria a 3)
 // con los umbrales del Plan Meteoalerta de cada zona de aviso y con los avisos oficiales, y deduce qué peligros
 // del catálogo activa cada fenómeno. Aquí se pintan los municipios por nivel, las zonas de aviso y los activos

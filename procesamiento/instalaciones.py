@@ -11,7 +11,7 @@ centro y su radio equivalente. El radio de alerta es el de la zona de nivel 1 qu
 centro si la instalación está sola en ella. Cuando las zonas de alerta de varias instalaciones se
 tocan y forman una sola mancha, su área no dice nada del radio de cada una: se estima como el radio
 de intervención más la diferencia mediana entre alerta e intervención de las instalaciones aisladas
-de la misma capa (decisión del 13-11-2026). Las instalaciones de distintas capas a menos de 300 m
+de la misma capa. Las instalaciones de distintas capas a menos de 300 m
 son la misma.
 
 El resultado (datos/procesados/instalaciones_seveso.csv) no se publica: se regenera en local.

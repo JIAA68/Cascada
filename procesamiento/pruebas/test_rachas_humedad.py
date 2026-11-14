@@ -1,4 +1,4 @@
-"""Pruebas de las rachas con tormenta y de la humedad del combustible hora a hora (decisiones del 10-11-2026)."""
+"""Pruebas de las rachas con tormenta y de la humedad del combustible hora a hora."""
 from datetime import datetime, timedelta, timezone
 
 import numpy as np

@@ -4,12 +4,11 @@ Riesgos potenciales sobre la población con menor capacidad de autoprotección e
 
 Cascada cruza las capas de peligrosidad del **Catálogo de Riesgos Potenciales de la Comunidad de Madrid** con los **centros donde se concentra la población más vulnerable** (centros educativos, hospitales y centros de diálisis, centros de atención social); anticipa a siete días, con la previsión y los avisos de AEMET, dónde el tiempo activa esos riesgos; y, ante un incendio forestal, estima su evolución y el momento en que alcanza a cada centro. Está pensada para gestores institucionales de protección civil.
 
-Es el demostrador presentado al datathon **DATAMAD 2026**. Se ejecuta en local, sin usuarios ni credenciales, y todo lo que muestra se regenera desde las fuentes oficiales con un solo comando.
+Es un demostrador: se ejecuta en local, sin usuarios ni credenciales, y todo lo que muestra se regenera desde las fuentes oficiales con un solo comando.
 
-**Vídeo y presentación:**
+**Presentación:**
 
-- [Simulación de un incendio](presentacion/cascada_simulacion_incendio.mp4) (MP4, 1 min 55 s). Ignición junto a Torrejón de la Calzada un día de julio a las 15:00, con viento del oeste a 20 km/h, reproducida minuto a minuto durante 24 horas, con rótulos en los momentos clave.
-- [Presentación ejecutiva](presentacion/cascada_presentacion.pdf) (PDF, 6 diapositivas).
+- [Presentación ejecutiva](presentacion/cascada_presentacion.pdf) (PDF, 8 diapositivas).
 
 ## Qué hace
 
@@ -63,6 +62,8 @@ y abrir <http://localhost:8765>. Es un único servidor en Python que sirve el vi
 
 | Método y ruta | Qué devuelve |
 |---|---|
+| `GET /api/municipios` | Municipios para el buscador: nombre, recuadro y punto de su capital |
+| `GET /api/resumen` | Población de las celdas de 1 km que cubren la Comunidad, para la ventana de datos del arranque |
 | `GET /api/celda?lon=&lat=` | Análisis basal de la celda de 1 km que contiene el punto |
 | `GET /api/activo?id=` | Ficha común y riesgos de un centro |
 | `GET /api/focos` | Focos de calor de NASA FIRMS en la Comunidad (últimas 24 h) |

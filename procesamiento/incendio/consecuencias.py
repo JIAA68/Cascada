@@ -1,7 +1,7 @@
 """Consecuencias de un incendio simulado: activos alcanzados, efecto cascada y municipios.
 
 - Activos alcanzados: la hora (minutos desde la ignición) a la que el fuego llega a menos de
-  250 m de cada activo de la ventana (decisión del 24-10-2026). Casi todos los centros están
+  250 m de cada activo de la ventana. Casi todos los centros están
   en suelo urbano, sin combustible: la amenaza les llega desde el borde.
 - Efecto cascada: cuando el fuego llega a una instalación peligrosa del catálogo, su zona de
   efectos se activa como amenaza derivada, con los activos que contiene.
@@ -10,7 +10,7 @@
   - Conducciones (6_12): el núcleo de la franja (nivel 3) es el trazado. Cuando el fuego entra
     en él se activa la franja (nivel 2 o más) en 750 m alrededor del tramo alcanzado.
 - Municipios: primer minuto en que el fuego entra en cada municipio.
-- Ruta del fuego hasta un activo (decisión del 11-11-2026): el camino por el que llega el fuego,
+- Ruta del fuego hasta un activo: el camino por el que llega el fuego,
   reconstruido hacia atrás sobre el mapa de tiempos de llegada. El visor la usa para la flecha de
   los avisos anticipados.
 """
@@ -140,7 +140,7 @@ def cascada_seveso(llegada: np.ndarray, v: Ventana, instalaciones: pd.DataFrame,
         dentro["distancia_m"] = distancia[distancia <= z.radio_alerta_m]
         nivel = nivel_en_puntos(z.capa, dentro.x.values, dentro.y.values)  # el activo debe estar en la zona del catálogo
         dentro = dentro[nivel >= 1].assign(nivel_catalogo=nivel[nivel >= 1])
-        # Intervención solo dentro del radio de intervención propio de la instalación (decisión del 13-11-2026): el
+        # Intervención solo dentro del radio de intervención propio de la instalación: el
         # nivel 2 del catálogo en el punto puede ser de la zona de otra instalación cercana
         dentro["zona"] = np.where(dentro.distancia_m <= z.radio_intervencion_m, "intervención", "alerta")
         dentro = dentro.drop(columns="distancia_m")
@@ -171,11 +171,30 @@ def cascada_conducciones(llegada: np.ndarray, v: Ventana, activos: pd.DataFrame)
     tramo = np.c_[v.x0 + (cols[t == t.min()][0] + 0.5) * v.celda, v.y0 - (filas[t == t.min()][0] + 0.5) * v.celda][0]
     x, y = v.x0 + (cols + 0.5) * v.celda, v.y0 - (filas + 0.5) * v.celda
     return {"primera_llegada_min": float(t.min()), "celdas_nucleo_alcanzadas": int(nucleo.sum()),
-            "x": float(tramo[0]), "y": float(tramo[1]), "franja": franja_por_hora(x, y, t)}, a
+            "x": float(tramo[0]), "y": float(tramo[1]), "franja": franja_por_hora(x, y, t),
+            "tramos": tramos_alcanzados(x, y, t)}, a
+
+
+def tramos_alcanzados(x, y, t, separacion_m: float = 2 * ALCANCE_CONDUCCION_M) -> list[dict]:
+    """Cada vez que el fuego alcanza un tramo nuevo de la conducción: [{"minutos", "x", "y"}].
+
+    Un tramo es nuevo si el fuego llega a una celda del núcleo sin ninguna celda del núcleo alcanzada antes a menos de
+    separacion_m (dos veces el alcance de la franja: su franja no se solapa con la ya activada). El primero es la
+    primera llegada. Si el fuego avanza a lo largo de la conducción, no hay tramos nuevos.
+    """
+    orden = np.argsort(t, kind="stable")
+    x, y, t = x[orden], y[orden], t[orden]
+    vecinos = cKDTree(np.c_[x, y]).query_ball_point(np.c_[x, y], separacion_m)
+    tramos = []
+    for i, cerca in enumerate(vecinos):
+        if min(cerca) < i:   # hay una celda del núcleo alcanzada antes (o a la vez, ya contada) a menos de separacion_m
+            continue
+        tramos.append({"minutos": round(float(t[i]), 1), "x": float(x[i]), "y": float(y[i])})
+    return tramos
 
 
 def franja_por_hora(x, y, t, alcance_m: float = ALCANCE_CONDUCCION_M, simplificar_m: float = 25.0) -> list[dict]:
-    """Franja activada de la conducción a medida que el fuego alcanza su núcleo, para dibujarla (decisión del 11-11-2026).
+    """Franja activada de la conducción a medida que el fuego alcanza su núcleo, para dibujarla.
 
     Para cada hora en que el fuego alcanza celdas nuevas del núcleo, la franja de alcance_m alrededor de todas las
     alcanzadas hasta entonces, en lon/lat: [{"minutos": primera llegada de esa hora, "hasta": la siguiente o None,
@@ -206,7 +225,7 @@ ISLA_MIN_M2 = 10_000       # ni las manchas de menos de 1 ha
 
 def isocronas(llegada: np.ndarray, v: Ventana, minuto_primera: float, cada_min: float = 60.0,
               horizonte_min: float = 24 * 60, simplificar_m: float = 50.0) -> list[dict]:
-    """Contorno del área quemada a cada hora del reloj (decisión del 11-11-2026).
+    """Contorno del área quemada a cada hora del reloj.
 
     minuto_primera: minutos desde la ignición hasta la primera hora en punto. Para cada hora, los anillos (exterior
     y huecos grandes) del área con llegada hasta entonces, simplificados y en lon/lat:
@@ -256,7 +275,7 @@ def municipios_alcanzados(llegada: np.ndarray, indice: np.ndarray, lista, v: Ven
 def poblacion_por_celda(llegada: np.ndarray, v: Ventana) -> list[dict]:
     """Población del Censo 2021 de cada celda de 1 km a la que llega el fuego, con el primer minuto de llegada.
 
-    Es la población de las celdas que toca el fuego (decisión del 13-11-2026): una cota alta, porque cuenta entera una
+    Es la población de las celdas que toca el fuego: una cota alta, porque cuenta entera una
     celda en cuanto arde una parte de ella, aunque el casco urbano no arda. El visor suma las celdas con llegada hasta
     cada minuto. Solo se devuelven celdas con población.
     """

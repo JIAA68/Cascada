@@ -1,4 +1,4 @@
-"""Red de carreteras, pistas y vías de tren de la Comunidad de Madrid (decisión del 11-11-2026).
+"""Red de carreteras, pistas y vías de tren de la Comunidad de Madrid.
 
 Fuente: Base Topográfica Armonizada 2017 (1:10.000) del geoportal IDEM de la Comunidad, servicio WFS
 geoidem/BTA/wfs, en EPSG:25830:

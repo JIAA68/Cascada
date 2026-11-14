@@ -77,6 +77,18 @@ def test_franja_de_la_conduccion_hora_a_hora():
     assert xs[0] < x[0] - 700 and xs[1] > x[-1] + 700
 
 
+def test_tramos_nuevos_de_la_conduccion():
+    from procesamiento.incendio.consecuencias import tramos_alcanzados
+    # Dos tramos de 1 km separados 5 km: el fuego recorre el primero desde el minuto 0 y llega al segundo en el 60
+    x = np.r_[np.arange(0, 1000, 50.0), 6000 + np.arange(0, 1000, 50.0)]
+    y = np.zeros_like(x)
+    t = np.r_[np.arange(20) * 2.0, 60 + np.arange(20) * 2.0]
+    tramos = tramos_alcanzados(x, y, t)
+    assert [(tr["minutos"], tr["x"]) for tr in tramos] == [(0.0, 0.0), (60.0, 6000.0)]
+    # Si el fuego avanza por la conducción sin saltos, solo cuenta la primera llegada
+    assert len(tramos_alcanzados(np.arange(0, 8000, 50.0), np.zeros(160), np.arange(160) * 1.0)) == 1
+
+
 def test_isocronas_a_cada_hora():
     from procesamiento.incendio.consecuencias import isocronas
     llegada = _llegada(ignicion=(100, 100), velocidad_m_min=20.0)     # círculo que crece 1,2 km por hora

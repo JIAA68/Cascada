@@ -63,7 +63,7 @@ def activos() -> pd.DataFrame:
     return a
 
 
-VULNERABILIDAD_AVISO = ("alta", "muy_alta")   # centros con aviso anticipado en el visor (decisión del 11-11-2026)
+VULNERABILIDAD_AVISO = ("alta", "muy_alta")   # centros con aviso anticipado en el visor
 
 
 def _lista(df: pd.DataFrame, columna: str, extra=()) -> tuple[list, dict]:
@@ -148,12 +148,20 @@ def simular(lon: float, lat: float, hora: datetime, viento_manual: Viento | list
                               "ruta": ruta_del_fuego(llegada, v, g.x.mean(), g.y.mean()),
                               "amenazas": [CAPAS_SEVESO[c] for c in g.capa],
                               "radio_intervencion_m": round(float(g.radio_intervencion_m.max())),
-                              "radio_alerta_m": round(float(g.radio_alerta_m.max()))})
+                              "radio_alerta_m": round(float(g.radio_alerta_m.max())),
+                              # Radios de cada amenaza, de mayor a menor alcance: los de la instalación son los mayores
+                              "zonas": [{"amenaza": CAPAS_SEVESO[z.capa], "radio_intervencion_m": round(float(z.radio_intervencion_m)),
+                                         "radio_alerta_m": round(float(z.radio_alerta_m))}
+                                        for z in g.sort_values("radio_alerta_m", ascending=False).itertuples()]})
     if conduccion:
-        # El punto alcanzado se coloca sobre el eje de la conducción que pinta el visor (decisión del 11-11-2026)
+        # El punto alcanzado se coloca sobre el eje de la conducción que pinta el visor
         conduccion["x"], conduccion["y"] = sobre_el_eje(conduccion["x"], conduccion["y"])
         conduccion["ruta"] = ruta_del_fuego(llegada, v, conduccion["x"], conduccion["y"])
         conduccion["lon"], conduccion["lat"] = A_GEO.transform(conduccion.pop("x"), conduccion.pop("y"))
+        for tr in conduccion["tramos"]:   # cada tramo nuevo alcanzado, con su punto en el eje y su ruta del fuego
+            tx, ty = sobre_el_eje(tr.pop("x"), tr.pop("y"))
+            tr["ruta"] = ruta_del_fuego(llegada, v, tx, ty)
+            tr["lon"], tr["lat"] = A_GEO.transform(tx, ty)
     zonas_humo = zonas_de_humo(llegada, v, vientos, HORIZONTE_MIN)
     humo_lista, humo_sens = _lista(activos_bajo_humo(zonas_humo, act), "humo_min")
     indice, lista_mun = municipios_en_ventana(v)
@@ -176,31 +184,31 @@ def simular(lon: float, lat: float, hora: datetime, viento_manual: Viento | list
         "distancia_alcanzado_m": DISTANCIA_ALCANZADO_M,
         "superficie_km2": {h: round(float((llegada <= h * 60).sum()) * v.celda ** 2 / 1e6, 2) for h in HORIZONTES_H},
         "municipios": municipios_alcanzados(llegada, indice, lista_mun, v),
-        # Población del Censo 2021 en las celdas de 1 km que toca el fuego (decisión del 13-11-2026)
+        # Población del Censo 2021 en las celdas de 1 km que toca el fuego
         "poblacion_celdas": poblacion_por_celda(llegada, v),
         "activos_llamas": llamas, "sensibles_llamas": llamas_sens,
         "cascada": {"instalaciones_seveso": instalaciones, "conduccion": conduccion, "activos": der_lista, "sensibles": der_sens},
         "humo": {"activos": humo_lista, "sensibles": humo_sens,
                  "parametros": {"semiangulo_grados": SEMIANGULO_GRADOS, "permanencia_h": PERMANENCIA_H,
                                 "alcance_max_km": ALCANCE_MAX_KM, "paso_min": PASO_MIN},
-                 # La misma geometría que marca los afectados, para que el visor la dibuje (decisión del 13-11-2026)
+                 # La misma geometría que marca los afectados, para que el visor la dibuje
                  "zonas": [{"minutos": m, "coords": np.round(np.column_stack(A_GEO.transform(*np.asarray(z.exterior.coords).T)), 5).tolist()}
                            for m, z in zonas_humo]},
         "llegada_url": f"/api/incendio/llegada?id={sello}",
-        # Minuto en que el fuego toca el borde de la ventana de cálculo (decisión del 13-11-2026): desde ahí, lo que
+        # Minuto en que el fuego toca el borde de la ventana de cálculo: desde ahí, lo que
         # queda fuera no se calcula y superficie y afectados se quedan cortos; None si no lo toca
         "borde_min": borde_de_la_ventana(llegada),
     }
     motivo = sin_propagacion(llegada, MODELOS[int(comb[fila, col])], lista_h)
     if motivo:
         respuesta["sin_propagacion"] = motivo
-    # Carreteras, pistas y vías de tren afectadas, y trenes de Cercanías programados (decisión del 11-11-2026)
+    # Carreteras, pistas y vías de tren afectadas, y trenes de Cercanías programados
     llegada_250 = llegada_en_radio(llegada, v.celda, DISTANCIA_ALCANZADO_M)
     respuesta["vias"] = vias_afectadas(llegada_250, v, zonas_humo)
     respuesta["trenes_programados"] = trenes_programados(llegada_250, v, zonas_humo, hora)
-    # Núcleos de población a los que llega el fuego, para anunciarlos en el mapa (decisión del 12-11-2026)
+    # Núcleos de población a los que llega el fuego, para anunciarlos en el mapa
     respuesta["poblaciones"] = poblaciones_alcanzadas(llegada_250, v)
-    # Isocronas a cada hora en punto (decisión del 11-11-2026)
+    # Isocronas a cada hora en punto
     local = hora.astimezone(MADRID)
     respuesta["isocronas"] = isocronas(llegada, v, 60 - local.minute - local.second / 60 if local.minute or local.second else 60)
     (carpeta / "respuesta.json").write_text(json.dumps(respuesta, ensure_ascii=False, indent=1), encoding="utf-8")

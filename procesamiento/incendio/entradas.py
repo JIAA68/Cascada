@@ -1,6 +1,6 @@
 """Entradas del modelo de incendio para una ventana alrededor de la ignición.
 
-- Ventana: rejilla de 50 m en EPSG:25830 (el sistema del catálogo), de 50 × 50 km (30 × 30 hasta el 13-11-2026),
+- Ventana: rejilla de 50 m en EPSG:25830 (el sistema del catálogo), de 50 × 50 km,
   centrada en la ignición y alineada a múltiplos del tamaño de celda.
 - Combustible: dentro de la Comunidad, su mapa de modelos de combustibles (LiDAR, rasterizado a 25 m y
   llevado a la rejilla por el modelo más frecuente; combustible_cm.py); fuera, el mapa europeo de EFFIS
@@ -9,11 +9,11 @@
   pendiente y la orientación. Cada descarga va a datos/cache y al registro local.
 - Viento: AEMET OpenData. La hora de ignición usa la observación de la estación más cercana
   con dato de viento; las siguientes, la predicción horaria del municipio de la ignición.
-  Rachas (decisión del 10-11-2026): el viento medio, salvo en las horas con tormenta prevista
+  Rachas: el viento medio, salvo en las horas con tormenta prevista
   (probabilidad de al menos el 40 %, el umbral de la prealerta) o, en la primera, con racha
   observada que alcance el umbral amarillo de Meteoalerta de la zona: entonces la racha.
   También puede darse a mano (respaldo si AEMET no responde).
-- Humedad del combustible (decisión del 10-11-2026): hora a hora, de la temperatura y la humedad
+- Humedad del combustible: hora a hora, de la temperatura y la humedad
   del aire de la misma observación y predicción (humedades_del_aire); a mano, la fija de verano.
 - Municipios: límites de la Comunidad de Madrid (2020), para el municipio de la ignición y
   el primer minuto en que el fuego entra en cada municipio.

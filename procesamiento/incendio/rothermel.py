@@ -103,7 +103,7 @@ def lecho(modelo: Modelo, humedades: Humedades) -> Lecho:
 def factor_viento(k: Lecho, viento_media_llama_kmh: float) -> float:
     """Factor de viento de Rothermel (adimensional).
 
-    Sin el límite de viento efectivo de Rothermel (U ≤ 0,9·I_R; decisión del 10-11-2026): Andrews, Cruz y Rothermel
+    Sin el límite de viento efectivo de Rothermel (U ≤ 0,9·I_R): Andrews, Cruz y Rothermel
     (2013, International Journal of Wildland Fire 22, 959-969) lo consideran demasiado restrictivo, y BehavePlus y
     FlamMap ya no lo aplican por defecto. Con él, el pasto apenas acelera con vientos fuertes.
     """

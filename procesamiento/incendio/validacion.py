@@ -13,7 +13,7 @@ Fuentes (se descargan y se anotan en datos/registro.csv):
   temperatura (83, °C) y humedad relativa (86, %).
 - Racha: AEMET OpenData, valores climatológicos diarios de la estación de Colmenar Viejo (3191E) del 11-08-2025.
 
-Decisiones del 10-11-2026: la racha máxima registrada por AEMET ese día va en la primera hora, cuando la prensa
+Viento: la racha máxima registrada por AEMET ese día va en la primera hora, cuando la prensa
 sitúa la carrera de 6 km, con la dirección del viento medido en la estación de la Red de Calidad del Aire a esa hora
 (la del parte diario de AEMET es de otra estación y otra hora); el resto de horas, el viento medio medido. La tabla
 compara además lo simulado hasta las 8 h, cuando el incendio real ya estaba perimetrado (el modelo no tiene extinción). La humedad del combustible de cada hora sale
@@ -225,7 +225,7 @@ def metricas(llegada: np.ndarray, transform, celda: float, xy0: tuple[float, flo
     Los valores por defecto son los de Tres Cantos: superficie conocida a las 15:00 del día siguiente, carrera de
     6 km en 40 minutos y perimetrado a las 8 h. En otros casos se pasan los suyos, o None si no se conocen.
 
-    hora_fija_h (decisión del 13-11-2026): la hora a la que se compara, fijada de antemano (no la mejor de las 24).
+    hora_fija_h: la hora a la que se compara, fijada de antemano (no la mejor de las 24).
     Ahí se da también el modelo nulo: un círculo centrado en la ignición con la misma superficie que la simulada, y la
     ganancia del modelo sobre él (si el modelo no acierta mejor que un círculo, la forma y la dirección no aportan).
     """

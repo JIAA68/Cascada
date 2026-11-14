@@ -9,7 +9,7 @@ from functools import lru_cache
 import pandas as pd
 
 from .capas import CAPAS, CON_FONDO, NIVELES, RIESGOS
-from .fuentes import PROCESADOS
+from .fuentes import PROCESADOS, VISOR
 from .rejilla import celda_de_lonlat, contorno, id_celda
 
 CAMPOS_ACTIVO = ["id", "familia", "subtipo", "tipo", "nombre", "municipio", "vulnerabilidad", "plazas", "lon", "lat"]
@@ -63,6 +63,42 @@ def activo(id_activo: str) -> dict:
     if id_activo not in a.index or bool(a.loc[id_activo, "sensible"]):
         raise NoEncontrado("Activo no encontrado")
     return resumen_activo(a.loc[id_activo])
+
+
+@lru_cache(maxsize=1)
+def municipios() -> list[dict]:
+    """Municipios para el buscador del visor: código, nombre, recuadro y punto de su capital.
+
+    El punto es la capital del municipio en el Nomenclátor del IGN (la que cae dentro de su término); si no hay
+    ninguna, un punto interior del término. Ahí se abre la celda de 1 km al elegirlo en el análisis basal.
+    """
+    import json
+
+    import shapely
+
+    from .incendio.entradas import A_GEO
+    g = json.loads((VISOR / "municipios.geojson").read_text(encoding="utf-8"))
+    p = pd.read_csv(PROCESADOS / "poblaciones.csv")
+    p = p[p.tipo == "Capital de municipio"]
+    lon, lat = A_GEO.transform(p.x.values, p.y.values)
+    capitales = shapely.points(lon, lat)
+    salida = []
+    for f in g["features"]:
+        forma = shapely.geometry.shape(f["geometry"])
+        dentro = capitales[shapely.contains(forma, capitales)]
+        punto = dentro[0] if len(dentro) else forma.representative_point()
+        oeste, sur, este, norte = forma.bounds
+        salida.append({"codigo": f["properties"]["codigo"], "nombre": f["properties"]["nombre"],
+                       "lon": round(punto.x, 5), "lat": round(punto.y, 5),
+                       "caja": [round(oeste, 5), round(sur, 5), round(este, 5), round(norte, 5)]})
+    return sorted(salida, key=lambda m: m["nombre"])
+
+
+def resumen() -> dict:
+    """Población de las celdas de 1 km que tocan la Comunidad (Censo 2021), para el resumen al arrancar el visor."""
+    r = rejilla()
+    return {"celdas": int(len(r)), "poblacion": {"total": int(r["poblacion"].sum()), "menores_16": int(r["menores_16"].sum()),
+                                                 "mayores_64": int(r["mayores_64"].sum())}}
 
 
 def celda(lon: float, lat: float) -> dict:

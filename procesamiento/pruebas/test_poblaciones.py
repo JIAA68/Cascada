@@ -1,4 +1,4 @@
-"""Núcleos de población alcanzados por el fuego (decisión del 12-11-2026)."""
+"""Núcleos de población alcanzados por el fuego."""
 import numpy as np
 import pandas as pd
 import shapely

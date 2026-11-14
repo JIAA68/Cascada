@@ -1,4 +1,4 @@
-"""Validación del modelo de incendio con varios incendios reales de la Comunidad de Madrid (decisión del 10-11-2026).
+"""Validación del modelo de incendio con varios incendios reales de la Comunidad de Madrid.
 
 Un solo caso, con el punto de ignición estimado, no basta: el resultado cambia con 15° de viento o 100 m de punto, y
 ajustar el modelo a un caso lo sobreajusta. Aquí cada incendio es una ficha (perímetro final de Copernicus EFFIS,
@@ -7,7 +7,7 @@ estimado y cuatro a RADIO_M) por tres giros del viento (GIROS), con el viento y 
 Calidad del Aire de la Comunidad. Las métricas (las de validacion.metricas) se resumen por caso con la mediana y el
 rango, y sirven para comparar configuraciones del modelo con el conjunto de casos, no con uno.
 
-Validación rigurosa (decisión del 13-11-2026):
+Validación rigurosa:
 - La métrica principal se toma a una hora fijada de antemano: la de contención publicada del caso o, si no se
   conoce, HORA_FIJA_H. La «mejor hora» de las 24 se sigue calculando, pero solo como referencia: elegirla a posteriori
   borra el error de ritmo.
@@ -73,7 +73,7 @@ CASOS = {
     "tres_cantos_2025": Caso("tres_cantos_2025", "Tres Cantos, 11-08-2025", 278333, validacion.INICIO, validacion.PUNTO_IGNICION,
                              "Ayuntamiento de Colmenar Viejo y prensa; punto estimado por el autor", 70.9,
                              {"avance": (6, 40), "referencia_min": 19 * 60 + 15, "contencion_h": 8}),
-    # Inicio y punto según la prensa (investigación del 10-11-2026); donde no hay lugar preciso, el extremo del perímetro
+    # Inicio y punto según la prensa; donde no hay lugar preciso, el extremo del perímetro
     # real situado de donde venía el viento medido a la hora de inicio, 100 m hacia dentro
     "colmenar_viejo_2024": Caso("colmenar_viejo_2024", "Tres Cantos y Colmenar Viejo, 22-08-2024", 238960,
                                 datetime(2024, 8, 22, 14, 6, tzinfo=MADRID), (-3.7030, 40.6226),

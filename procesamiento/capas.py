@@ -27,7 +27,7 @@ CAPAS = {
 }
 # Capa adicional del efecto cascada (radiación térmica de instalaciones Seveso)
 CAPA_RADIACION = "6_5"
-# Capas combinadas por grupo (decisión del 09-11-2026): nivel máximo de las capas del grupo en cada píxel, sin el
+# Capas combinadas por grupo: nivel máximo de las capas del grupo en cada píxel, sin el
 # fondo de incendios y avión. Es lo que se muestra al marcar un grupo entero, en vez de superponer sus capas.
 # código -> (nombre, grupo de CAPAS que combina)
 COMBINADAS = {

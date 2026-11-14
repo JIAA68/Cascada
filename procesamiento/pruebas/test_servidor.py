@@ -92,6 +92,33 @@ def test_api_celda(base):
     assert len(d["contorno"]) == 5
 
 
+def test_api_resumen(base):
+    estado, _, cuerpo = pedir(base + "/api/resumen")
+    assert estado == 200
+    assert json.loads(cuerpo) == {"celdas": 2, "poblacion": {"total": 3000, "menores_16": 200, "mayores_64": 400}}
+
+
+def test_api_municipios(base, datos, monkeypatch, tmp_path):
+    # Un municipio cuadrado con su capital dentro y otro sin capital (punto interior del término)
+    cuadrado = lambda x0, y0: [[[x0, y0], [x0 + 0.1, y0], [x0 + 0.1, y0 + 0.1], [x0, y0 + 0.1], [x0, y0]]]
+    (tmp_path / "municipios.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": [
+        {"type": "Feature", "properties": {"codigo": "28079", "nombre": "Madrid"}, "geometry": {"type": "Polygon", "coordinates": cuadrado(-3.75, 40.37)}},
+        {"type": "Feature", "properties": {"codigo": "28001", "nombre": "La Acebeda"}, "geometry": {"type": "Polygon", "coordinates": cuadrado(-3.65, 41.05)}},
+    ]}), encoding="utf-8")
+    from procesamiento.incendio.entradas import A_UTM
+    x, y = A_UTM.transform(-3.7035, 40.4168)
+    pd.DataFrame([{"nombre": "Madrid", "tipo": "Capital de municipio", "x": x, "y": y}]).to_csv(datos / "poblaciones.csv", index=False)
+    monkeypatch.setattr(consultas, "VISOR", tmp_path)
+    consultas.municipios.cache_clear()
+    estado, _, cuerpo = pedir(base + "/api/municipios")
+    consultas.municipios.cache_clear()
+    assert estado == 200
+    acebeda, madrid = json.loads(cuerpo)                          # por orden alfabético
+    assert (madrid["lon"], madrid["lat"]) == (-3.7035, 40.4168)
+    assert madrid["caja"] == [-3.75, 40.37, -3.65, 40.47]
+    assert -3.65 < acebeda["lon"] < -3.55 and 41.05 < acebeda["lat"] < 41.15
+
+
 def test_api_celda_fuera_y_parametros(base):
     assert pedir(base + "/api/celda?lon=2.17&lat=41.38")[0] == 404
     assert pedir(base + "/api/celda?lon=x")[0] == 400

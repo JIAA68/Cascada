@@ -1,11 +1,11 @@
-"""Trenes y tráfico en tiempo real frente a un incendio simulado (decisión del 08-11-2026).
+"""Trenes y tráfico en tiempo real frente a un incendio simulado.
 
 Cruza la situación actual (posición de los trenes de viajeros, incidencias de la DGT y puntos de
 medida del tráfico de la ciudad) con la evolución estimada de una simulación guardada:
 
 - llamas: minuto en que el fuego llega a menos de 250 m del elemento (la misma distancia de
   "alcanzado" que los activos);
-- humo: primer horizonte (1, 3, 6, 12 o 24 h) en que el elemento queda bajo la zona de humo.
+- humo: primer minuto (en pasos de 5 min, humo.PASO_MIN) en que el elemento queda bajo la zona de humo.
 
 Es una foto del momento de la consulta: un tren se mueve y no se proyecta su recorrido. Sirve
 para ver qué trenes circulan ahora por la zona que se verá afectada y qué carreteras de la zona

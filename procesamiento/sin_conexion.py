@@ -1,8 +1,8 @@
-"""Modo sin conexión para la defensa (decisión del 13-11-2026).
+"""Modo sin conexión para la defensa.
 
 Con red, el visor pide el mapa base, el relieve y la ortofoto directamente al IGN y las tipografías a MapLibre. Con
 el servidor arrancado con --sin-conexion, los pide al servidor local (/externo/...), que los sirve desde la copia
-guardada en disco (datos/cache/externo/) y nunca los pide fuera (decisión del 13-11-2026: el servidor no hace de
+guardada en disco (datos/cache/externo/) y nunca los pide fuera (el servidor no hace de
 intermediario cuando hay red). Las librerías del visor (MapLibre GL JS y PMTiles) van en visor/vendor/. En ese modo
 cualquier petición a internet del proceso falla en el acto, para que nada se quede esperando a una red que no hay.
 

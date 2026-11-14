@@ -7,7 +7,7 @@ centro su familia, su subtipo, su vulnerabilidad y si es un centro sensible.
 Recuentos esperados: 3.163 educativos, 105 sanitarios y 2.643 de atención social.
 
 La salida (datos/procesados/activos.csv) no lleva NIF, teléfonos, correos ni webs
-(sin datos personales). Centros sensibles (decisiones del 13-11-2026): los que la propia
+(sin datos personales). Centros sensibles: los que la propia
 Comunidad publica con algún campo `RESERVADO` (dirección, municipio, código postal o
 teléfono). No se ubican ni se geocodifican: quedan fuera del mapa y solo se cuentan en total.
 Los centros sin coordenadas también quedan fuera del mapa, pero se cuentan. En los centros de
@@ -42,7 +42,7 @@ SECTORES_ADULTOS_AUTONOMOS = {
     "Otros grupos en situación de necesidad", "(Inmigracion) Otros grupos en situación de necesidad",
     "Familia", "Colectivos en situación de necesidad", "Conjunto de la población"}
 
-# --- Tipo corto delante del nombre en el visor (decisión del 12-11-2026) ---------------
+# --- Tipo corto delante del nombre en el visor ---------------
 # Educativos, por código de tipo de centro
 TIPO_EDUCATIVO = {
     **dict.fromkeys(("003", "004", "006", "008"), "Escuela infantil"), "005": "Casa de niños",
@@ -62,7 +62,7 @@ TIPO_SOCIAL = {
     **dict.fromkeys(("CENTROS OCUPACIONALES GENÉRICOS", "CENTROS OCUPACIONALES:OTROS"), "Centro ocupacional"),
     "TALLERES": "Taller ocupacional", "CENTROS DE REHABILITACIÓN: OTROS": "Centro de rehabilitación",
     "CENTROS DE RECUPERACIÓN": "Centro de recuperación", "CENTROS DE ATENCIÓN": "Centro de atención"}
-# Solo los colectivos que no son de protección llevan el colectivo en el rótulo (decisión del 13-11-2026): un piso de
+# Solo los colectivos que no son de protección llevan el colectivo en el rótulo: un piso de
 # seis plazas rotulado «· mujeres» o «· reclusos» lo señalaría en el mapa; en esos centros queda solo el tipo
 COLECTIVO_SOCIAL = {"Personas mayores": " de mayores", "Personas con discapacidad intelectual": " · discapacidad intelectual",
                     "Personas con enfermedad mental crónica": " · enfermedad mental",

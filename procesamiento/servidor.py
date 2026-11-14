@@ -232,9 +232,13 @@ class Manejador(BaseHTTPRequestHandler):
             self.error(HTTPStatus.SERVICE_UNAVAILABLE, str(e))
 
     def api(self, ruta, parametros):
-        from .consultas import NoEncontrado, activo, celda
+        from .consultas import NoEncontrado, activo, celda, municipios, resumen
         try:
-            if ruta == "/api/celda":
+            if ruta == "/api/resumen":
+                datos = resumen()
+            elif ruta == "/api/municipios":
+                datos = municipios()
+            elif ruta == "/api/celda":
                 datos = celda(*coordenadas(parametros["lon"][0], parametros["lat"][0]))
             elif ruta == "/api/activo":
                 datos = activo(parametros["id"][0])

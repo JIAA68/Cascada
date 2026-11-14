@@ -1,6 +1,7 @@
-// Movilidad en tiempo real (decisión del 08-11-2026): trenes de viajeros (Renfe) y tráfico
+// Movilidad en tiempo real: trenes de viajeros (Renfe) y tráfico
 // (puntos de medida de la ciudad de Madrid e incidencias de la DGT en toda la Comunidad).
-// Capas opcionales en los dos modos, apagadas al empezar, con una casilla cada una en «Elementos del mapa».
+// Capas opcionales en los tres modos, con una casilla cada una en «Elementos del mapa». Apagadas al empezar (el
+// visor arranca con todo desmarcado); en la copia sin conexión no se encienden nunca al arrancar.
 // En gestión de crisis, la evolución simulada se cruza con la situación actual (cruzarMovilidad).
 "use strict";
 
@@ -65,6 +66,14 @@ document.addEventListener("mapa-listo", () => {
     mapa.on("mouseenter", id, () => mapa.getCanvas().style.cursor = "pointer");
     mapa.on("mouseleave", id, () => mapa.getCanvas().style.cursor = "");
   }
+  for (const capa of ["trenes", "trafico"]) activarMovilidad(capa, !SIN_CONEXION && $(`#ver-${capa}`).checked);
+  // La ventana «Datos del visor» lleva trenes, tráfico e incidencias aunque sus capas estén apagadas: se piden una vez
+  if (!SIN_CONEXION) {
+    movil.datos.trenes = movil.datos.trenes || null; movil.datos.trafico = movil.datos.trafico || null;
+    leyendaMovilidad();
+    if (!movil.trenes) cargarTrenes();
+    if (!movil.trafico) cargarTrafico();
+  } else leyendaMovilidad();
 });
 
 function emergente(lngLat, contenido) {
@@ -113,13 +122,19 @@ const horaDeIso = (iso) => (iso || "").slice(11, 16);
 
 function leyendaMovilidad() {
   const caja = $("#movilidad-leyenda"), partes = [];
-  if (movil.trenes) {
+  if (!caja) return;   // va en el resumen del arranque; cerrado, ya no se muestra
+  if (SIN_CONEXION && !movil.trenes && !movil.trafico) {
+    caja.hidden = false;
+    caja.innerHTML = `<h3>En tiempo real</h3><p class="meta">Copia sin conexión: sin trenes, tráfico ni incidencias de la DGT.</p>`;
+    return;
+  }
+  if (movil.trenes || "trenes" in movil.datos) {
     const d = movil.datos.trenes;
     partes.push(`<div><span class="tren"></span><strong>Trenes de viajeros</strong> · ` + (!d ? "consultando…"
       : d.error ? `<span class="error">${html(d.error)}</span>` : `${d.trenes.length} a las ${horaDeIso(d.marca || d.consultado)}`) +
       `<br><span class="meta">Renfe, GTFS-Realtime (CC BY 4.0). Cada 30 s. Sin estimar personas.</span></div>`);
   }
-  if (movil.trafico) {
+  if (movil.trafico || "trafico" in movil.datos) {
     const d = movil.datos.trafico;
     const ciudad = !d ? "consultando…" : d.ciudad.error ? `<span class="error">${html(d.ciudad.error)}</span>`
       : `${numero(d.ciudad.puntos.length)} puntos, datos de las ${(d.ciudad.marca || "").slice(11, 16)}`;
@@ -132,7 +147,7 @@ function leyendaMovilidad() {
       `<span class="senal peligro"></span>otras<br><span class="meta">Toda la Comunidad. Cada 5 min.</span></div>`);
   }
   caja.hidden = !partes.length;
-  caja.innerHTML = partes.join("");
+  caja.innerHTML = partes.length ? `<h3>En tiempo real</h3>${partes.join("")}` : "";
 }
 
 // ----------------------------------------------------------------------------- cruce con la crisis
@@ -169,7 +184,7 @@ async function cruzarMovilidad(sim) {
     bloque("Tráfico de la ciudad", d.ciudad, (e) => `${html(e.descripcion)} · ${NIVEL_TRAFICO[e.nivel]}`,
       (e) => `<span class="semaforo" style="background:${SEMAFORO[e.nivel]}"></span>`);
   for (const li of seccion.querySelectorAll("li[data-lon]")) li.onclick = () => mapa.flyTo({ center: [+li.dataset.lon, +li.dataset.lat], zoom: 14 });
-  // En la animación, cada uno con un punto del color del efecto y su nombre (decisión del 12-11-2026)
+  // En la animación, cada uno con un punto del color del efecto y su nombre
   const nombres = { trenes: (e) => `Tren de Cercanías · ${e.linea}`, incidencias: (e) => `${e.tipo} · ${lugarIncidencia(e)}`,
     ciudad: (e) => `Punto de tráfico · ${e.descripcion}` };
   anadirAfectados(["trenes", "incidencias", "ciudad"].flatMap((k) => (d[k].afectados || []).map((e) => afectado(e.lon, e.lat,

@@ -10,7 +10,7 @@
 //   ferrocarril y nombres. Capas con id "ref-…"; los nombres, "ref-nombre-…".
 "use strict";
 
-// Con red, directamente al IGN; sin conexión, la copia guardada del servidor (decisión del 13-11-2026)
+// Con red, directamente al IGN; sin conexión, la copia guardada del servidor
 const SIN_CONEXION = window.CASCADA_SIN_CONEXION === true;
 const COPIA = `${location.origin}/externo`;
 const IGN_VECTORIAL = SIN_CONEXION ? `${COPIA}/ign-vectorial/{z}/{x}/{y}.pbf` : "https://vt-mapabase.idee.es/1.0.0/mapabase/{z}/{x}/{y}.pbf";
@@ -63,7 +63,7 @@ function construirReferencias(mapa) {
   const enUso = ["==", ["get", "estado"], "en_uso"];
   const redondo = { "line-join": "round", "line-cap": "round" };
 
-  // Carreteras: gris más oscuro y más ancho cuanto más importantes, sin borde (decisión del 11-11-2026: el borde
+  // Carreteras: gris más oscuro y más ancho cuanto más importantes, sin borde (el borde
   // blanco quedaba raro, sobre todo en la ortofoto)
   const via = (id, capaFuente, minzoom, ancho, color) => {
     mapa.addLayer({ id: `ref-${id}`, type: "line", ...v, "source-layer": capaFuente, minzoom, filter: enUso,

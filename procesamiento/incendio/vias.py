@@ -1,6 +1,6 @@
-"""Carreteras y vías de tren afectadas por un incendio simulado, y trenes programados (decisión del 11-11-2026).
+"""Carreteras y vías de tren afectadas por un incendio simulado, y trenes programados.
 
-Las pistas forestales de la red no entran: en el mapa despistaban más que ayudaban (decisión del 12-11-2026).
+Las pistas forestales de la red no entran: en el mapa despistaban más que ayudaban.
 
 - Un tramo está afectado **por el fuego** desde el minuto en que el fuego llega a menos de 250 m de alguno de sus
   puntos (la misma distancia que los activos): probable corte. Y **por el humo** desde el primer horizonte en que
@@ -79,7 +79,7 @@ def vias_afectadas(llegada_250: np.ndarray, v: Ventana, zonas_humo) -> dict:
              "km_llamas": round(float(red["largo"][g[np.isfinite(g.llamas)].tramo.unique()].sum()) / 1000, 1),
              "lon": round(plon, 5), "lat": round(plat, 5)}
         if np.isfinite(g.llamas).any():
-            # Punto por el que llega el fuego, para anunciarlo en el mapa (decisión del 12-11-2026)
+            # Punto por el que llega el fuego, para anunciarlo en el mapa
             q = g.loc[g.llamas.idxmin()]
             llon, llat = A_GEO.transform(q.x, q.y)
             r["lon_llamas"], r["lat_llamas"] = round(llon, 5), round(llat, 5)
@@ -100,7 +100,7 @@ def trenes_programados(llegada_250: np.ndarray, v: Ventana, zonas_humo, inicio: 
     """Estaciones de Cercanías afectadas y trenes programados que pasan por ellas cuando ya lo están.
 
     Si la fecha simulada cae fuera del horario descargado (30 días), se usan los trenes del mismo día de la semana dentro
-    del horario (decisión del 13-11-2026) y la respuesta dice qué día se ha tomado.
+    del horario y la respuesta dice qué día se ha tomado.
     """
     estaciones, pasos = cercanias.cargar()
     fechas = (pasos.fecha.min(), pasos.fecha.max())

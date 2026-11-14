@@ -1,4 +1,4 @@
-"""Núcleos de población de la Comunidad de Madrid y los que alcanza un incendio simulado (decisión del 12-11-2026).
+"""Núcleos de población de la Comunidad de Madrid y los que alcanza un incendio simulado.
 
 El mapa de crisis anuncia las poblaciones a las que va a llegar el fuego. Nombres y posición: Nomenclátor
 Geográfico Básico de España del IGN (servicio WFS INSPIRE de nombres geográficos), con los tipos «Capital de

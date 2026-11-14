@@ -2,7 +2,7 @@
 
 Al marcar un grupo entero en el visor no se superponen sus capas (con una sola paleta, el color sería el de la
 capa dibujada encima y no se entendería nada), sino que se muestra una capa única con el nivel máximo del grupo
-en cada punto (decisión del 09-11-2026). El nivel 1 de fondo de incendios forestales y avión, que cubre todo el
+en cada punto. El nivel 1 de fondo de incendios forestales y avión, que cubre todo el
 territorio, no cuenta. Es una vista de conjunto para localizar dónde hay algún peligro del grupo y de qué nivel,
 no un índice: el nivel de cada capa mide cosas distintas (docs/metodologia.md, apartado 2.1).
 

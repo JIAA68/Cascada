@@ -8,10 +8,9 @@ esa hora, abriéndose en un cono:
 La zona de humo es la envolvente convexa del área quemada y de esa misma área desplazada viento
 abajo y ensanchada a cada lado. Sin viento, el humo se queda en 500 m alrededor del fuego.
 
-Una sola geometría (decisión del 13-11-2026): la zona se calcula aquí cada PASO_MIN minutos; el
+Una sola geometría: la zona se calcula aquí cada PASO_MIN minutos; el
 visor dibuja esas mismas zonas y cada centro, carretera, vía o estación queda bajo el humo en el
-primer paso en que su punto cae dentro. Antes el visor dibujaba su propio cono minuto a minuto y el
-servidor marcaba con otro solo en cinco horizontes, y no coincidían.
+primer paso en que su punto cae dentro. Así lo que se ve y lo que se marca coinciden siempre.
 
 No es un modelo de dispersión: no tiene en cuenta la altura de la columna, la estabilidad
 atmosférica, el relieve ni la concentración. Señala qué activos pueden quedar a sotavento.

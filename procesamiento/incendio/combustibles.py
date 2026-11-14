@@ -84,13 +84,13 @@ VIVA_VERANO_SECO = 0.60   # escenario «muy seco» de BehavePlus para el combust
 
 
 def humedad_viva(fecha) -> float:
-    """Humedad del combustible vivo según el mes (decisión del 10-11-2026): 60 % de julio a septiembre, 90 % el resto."""
+    """Humedad del combustible vivo según el mes: 60 % de julio a septiembre, 90 % el resto."""
     return VIVA_VERANO_SECO if fecha.month in MESES_SECOS else VERANO.m_viva
 
 
 
 def humedades_del_aire(temperatura_c: float, humedad_relativa: float) -> Humedades:
-    """Humedades del combustible para una hora (decisión del 10-11-2026): la de equilibrio en el muerto fino (1 h),
+    """Humedades del combustible para una hora: la de equilibrio en el muerto fino (1 h),
     1 y 2 puntos más en el de 10 y 100 h, y el vivo fijo del escenario de verano (no hay dato que lo varíe)."""
     m1 = min(max(humedad_equilibrio(temperatura_c, humedad_relativa) / 100, HUMEDAD_FINA_MIN), 0.30)
     return Humedades(round(m1, 3), round(m1 + 0.01, 3), round(m1 + 0.02, 3), VERANO.m_viva)

@@ -97,10 +97,52 @@ ul.activos li .marca.humo { background: #6b6b6b; }
 h4 { font-size: 13px; margin: 10px 0 4px; }
 
 /* ---------------------------------------------------------------- trenes y tráfico en tiempo real */
-#movilidad-leyenda { position: absolute; left: 10px; top: 10px; z-index: 4; max-width: 300px; font-size: 12px;
-  background: rgba(255,255,255,.94); border: 1px solid var(--borde); border-radius: 6px; padding: 6px 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+/* Ficha de la celda o del activo: arriba a la izquierda del mapa, con su botón Cerrar */
+#ficha-mapa { position: absolute; left: 10px; top: 10px; z-index: 5; width: min(380px, calc(100% - 20px));
+  max-height: calc(100% - 60px); overflow-y: auto; font-size: 13px; background: #fff; border: 1px solid var(--borde);
+  border-radius: 8px; padding: 0 16px 12px; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+#ficha-mapa .acciones { position: sticky; top: 0; margin: 0 -16px; padding: 8px 12px 6px; text-align: right; background: #fff; z-index: 1; }
+#ficha-mapa h2 { margin-top: 0; }
+#ficha-cerrar { font: inherit; padding: 3px 12px; border-radius: 5px; border: 1px solid #1f2328; background: #1f2328; color: #fff; cursor: pointer; }
+#ficha-cerrar:hover { background: #3a3f45; }
+#datos-inicio .ayuda-inicio { margin: 0 0 10px; }
+
+/* Buscador de municipios: arriba en el centro del mapa */
+#buscador { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 5;
+  width: min(320px, calc(100% - 140px)); font-size: 13px; }
+#buscador-texto { width: 100%; box-sizing: border-box; font: inherit; padding: 7px 12px; border: 1px solid var(--borde);
+  border-radius: 6px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+#buscador-texto:focus { outline: 2px solid #1f2328; outline-offset: 0; }
+#buscador-lista { list-style: none; margin: 4px 0 0; padding: 4px 0; background: #fff; border: 1px solid var(--borde);
+  border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.2); max-height: 280px; overflow-y: auto; }
+#buscador-lista li { padding: 5px 12px; cursor: pointer; }
+#buscador-lista li.activo, #buscador-lista li:hover { background: #eef1f4; }
+#buscador-lista li.vacio { color: var(--suave); cursor: default; background: none; }
+
+/* Resumen de datos al arrancar: centrado sobre el mapa, se cierra con su botón y no vuelve */
+#datos-inicio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6;
+  width: min(780px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; font-size: 13px;
+  background: #fff; border: 1px solid var(--borde); border-radius: 8px; padding: 14px 18px 0;
+  box-shadow: 0 6px 24px rgba(0,0,0,.28); }
+#datos-inicio h2 { font-size: 16px; margin: 0 0 8px; }
+#datos-inicio .columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+@media (max-width: 900px) { #datos-inicio .columnas { grid-template-columns: 1fr; } }
+#datos-inicio section { padding: 8px 0; border-top: 1px solid #eee; }
+#datos-inicio section p { margin: 0; }
+#datos-inicio h3 { font-size: 13px; margin: 0 0 4px; }
+#datos-inicio table { width: 100%; border-collapse: collapse; }
+#datos-inicio td { padding: 1px 0; }
+#datos-inicio td.num { text-align: right; font-variant-numeric: tabular-nums; }
+#datos-inicio tr.familia td { font-weight: 600; padding-top: 4px; }
+#datos-inicio tr.subtipo td:first-child { padding-left: 18px; }
+#datos-inicio tr.total td { font-weight: 600; border-top: 1px solid #eee; padding-top: 3px; }
 #movilidad-leyenda div + div { margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; }
+/* El botón, siempre a la vista aunque haya que desplazar el contenido */
+#datos-inicio .acciones { position: sticky; bottom: 0; margin: 0 -18px; padding: 10px 18px 14px; text-align: right;
+  background: #fff; border-top: 1px solid #eee; }
+#datos-inicio-cerrar { font: inherit; padding: 5px 16px; border-radius: 5px; border: 1px solid #1f2328; background: #1f2328;
+  color: #fff; cursor: pointer; }
+#datos-inicio-cerrar:hover { background: #3a3f45; }
 .semaforo, .tren { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 3px 0 6px;
   vertical-align: -1px; border: 1px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
 .semaforo:first-child, .tren:first-child { margin-left: 0; }
@@ -168,8 +210,8 @@ table.comparacion tbody th { font-weight: 500; width: 34%; }
 /* Resultado sin propagación */
 .aviso { background: #fff4e5; border-left: 3px solid #d9772b; padding: 6px 8px; margin: 0.4rem 0; }
 
-/* Cartela de aviso apartada de su objetivo, con conector (decisión del 12-11-2026) */
-/* Urgencia (decisión del 12-11-2026): a más de una hora, gris azulado (el ámbar se confundía con las conducciones, 13-11-2026); a menos, naranja; alcanzado, rojo. Franja: color del tipo */
+/* Cartela de aviso apartada de su objetivo, con conector */
+/* Urgencia: a más de una hora, gris azulado (el ámbar se confundiría con las conducciones); a menos, naranja; alcanzado, rojo. Franja: color del tipo */
 .cartela { --c-borde: #5b6b80; --c-fondo: #fff; --c-texto: #1b1b1b; --c-cuenta: #3f4a5a; width: 0; height: 0; overflow: visible; }
 .cartela.cerca { --c-borde: #e65c00; --c-fondo: #ffe3cc; --c-cuenta: #9a3a00; }
 .cartela.alcanzado { --c-borde: #7a140f; --c-fondo: #b3261e; --c-texto: #fff; --c-cuenta: #fff; }
@@ -186,11 +228,11 @@ table.comparacion tbody th { font-weight: 500; width: 34%; }
 .globo-aviso .nombre { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; }
 .globo-aviso .cuenta { display: block; color: var(--c-cuenta); }
 
-/* Cronología de sucesos (decisión del 11-11-2026) */
+/* Cronología de sucesos */
 #cronologia-mapa { position: absolute; top: 10px; right: 50px; z-index: 5; width: 300px; max-width: calc(100% - 70px); max-height: 45%;
   overflow: hidden; background: rgba(255,255,255,.95); border: 1px solid var(--borde); border-radius: 6px; padding: 6px 8px;
   font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
-/* ES-Alert sobre el mapa, con aspecto de aviso en un móvil (decisión del 13-11-2026) */
+/* ES-Alert sobre el mapa, con aspecto de aviso en un móvil */
 #esalert-mapa { position: absolute; top: 10px; left: 10px; z-index: 5; width: 280px; background: #111; border-radius: 22px;
   padding: 8px 8px 12px; box-shadow: 0 4px 14px rgba(0,0,0,.35); color: #fff; font-size: 12px; }
 #esalert-mapa .barra { display: flex; justify-content: space-between; padding: 2px 10px 6px; font-size: 11px; color: #ccc; }
@@ -228,14 +270,14 @@ ul.cronologia li.clave .nombre { font-weight: 600; color: #8b1a14; }
 #rep-sucesos .tic.clave { top: 0; height: 12px; width: 4px; background: #b3261e; }
 #reproductor #rep-sucesos + input[type=range] { margin-top: 0; }
 
-/* Carreteras y vías afectadas (decisión del 11-11-2026) */
+/* Carreteras y vías afectadas */
 .linea-via { display: inline-block; width: 18px; height: 0 !important; border: none !important; border-top: 4px solid #d1121b !important;
   background: none !important; vertical-align: middle; margin: 0 5px 0 2px; }
 #cronologia-mapa li.vias { border-left-color: #8b1a14; }
 .punto-suceso.vias { background: #8b1a14; }
 #rep-sucesos .tic.vias { background: #8b1a14; }
 
-/* Esquema de la cascada (decisión del 11-11-2026) */
+/* Esquema de la cascada */
 .esquema-cascada { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 10px; }
 .cadena { display: flex; flex-direction: column; align-items: stretch; font-size: 12px; transition: opacity .4s; }
 .cadena + .cadena { margin-top: 6px; }
@@ -248,12 +290,12 @@ ul.cronologia li.clave .nombre { font-weight: 600; color: #8b1a14; }
 .flecha-esquema { align-self: center; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent;
   border-top: 8px solid #d9772b; margin: 2px 0; }
 
-/* Isocronas (decisión del 11-11-2026) */
+/* Isocronas */
 .linea-via.isocrona { border-top: 2px dashed #7a1f0e !important; }
 
-/* Conducciones de hidrocarburos: línea amarilla (decisión del 11-11-2026) */
+/* Conducciones de hidrocarburos: línea amarilla */
 .linea-via.conduccion { border-top: 3px solid #f5c400 !important; }
-/* Símbolos de los globos de aviso de carreteras, vías, poblaciones y Seveso (decisión del 12-11-2026) */
+/* Símbolos de los globos de aviso de carreteras, vías, poblaciones y Seveso */
 .linea-via.tren-aviso { border-top: 3px dashed #d1121b !important; }
 .simbolo.poblacion-aviso { background: #5a5a5a; border-radius: 2px; }
 .simbolo.seveso-aviso { background: #fff; border: 3px solid #d9772b; width: 7px; height: 7px; }

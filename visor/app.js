@@ -4,7 +4,7 @@
 
 // ----------------------------------------------------------------------------- fondos del IGN
 // Con red, el mapa base, el relieve, la ortofoto y las tipografías se piden directamente al IGN y a MapLibre; con el
-// servidor sin conexión, a su copia guardada (/externo/, procesamiento/sin_conexion.py). Decisión del 13-11-2026.
+// servidor sin conexión, a su copia guardada (/externo/, procesamiento/sin_conexion.py).
 // SIN_CONEXION y COPIA se definen en mapabase.js, que se carga antes.
 // Ortofoto PNOA del IGN (WMTS)
 const WMTS = (servicio, capa, formato) =>
@@ -12,7 +12,7 @@ const WMTS = (servicio, capa, formato) =>
   `&style=default&tilematrixset=GoogleMapsCompatible&tilematrix={z}&tilerow={y}&tilecol={x}&format=image/${formato}`;
 // El modo "Mapa" es el mapa base operativo (mapabase.js); este es el de la ortofoto. Sobre ella van los mismos
 // rótulos y carreteras del mapa base (capas "ref-…"), no la capa de nombres del IGN para ortofoto (IGNBaseOrto):
-// esa pinta los embalses a máximo nivel en azul y duplica los nombres (decisión del 11-11-2026)
+// esa pinta los embalses a máximo nivel en azul y duplica los nombres
 const FONDOS = {
   "ign-pnoa": SIN_CONEXION ? `${COPIA}/ign-pnoa/{z}/{x}/{y}.jpeg` : WMTS("pnoa-ma", "OI.OrthoimageCoverage", "jpeg"),
 };
@@ -73,7 +73,7 @@ const visible = (id, si) => mapa.setLayoutProperty(id, "visibility", si ? "visib
 const $ = (sel) => document.querySelector(sel);
 const html = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const numero = (n) => n.toLocaleString("es-ES");
-// Tipo corto delante del nombre de cada centro (decisión del 12-11-2026): «Colegio de primaria · MARIA AUXILIADORA».
+// Tipo corto delante del nombre de cada centro: «Colegio de primaria · MARIA AUXILIADORA».
 // De los hospitales el conjunto no publica el nombre: el nombre ya es el tipo
 const rotulo = (a) => a.tipo && a.tipo !== a.nombre ? `${a.tipo} · ${a.nombre}` : a.nombre;
 
@@ -124,6 +124,7 @@ function cambiarModo(nuevo) {
     $(`#panel-${m}`).hidden = nuevo !== m;
   }
   if (mapa.getSource("celda")) mapa.getSource("celda").setData({ type: "FeatureCollection", features: [] });
+  if (nuevo !== "basal") $("#ficha-mapa").hidden = true;   // la ficha es del análisis basal
   document.dispatchEvent(new CustomEvent("modo", { detail: nuevo }));
 }
 for (const m of ["basal", "prealerta", "crisis"]) $(`#modo-${m}`).onclick = () => cambiarModo(m);
@@ -131,8 +132,8 @@ for (const m of ["basal", "prealerta", "crisis"]) $(`#modo-${m}`).onclick = () =
 // ----------------------------------------------------------------------------- capas de peligrosidad
 // La casilla de un grupo no superpone sus capas (con una sola paleta, el color sería el de la capa dibujada
 // encima): muestra la capa combinada con el nivel máximo del grupo en cada punto, sin el fondo de incendios y
-// avión, que genera la cadena de datos (decisión del 09-11-2026). Una capa suelta y la combinada de su grupo no
-// se muestran a la vez.
+// avión, que genera la cadena de datos. Una capa suelta y la combinada de su grupo no
+// se muestran a la vez. Al empezar, todas apagadas (el visor arranca con todo desmarcado).
 const COMBINADAS = { Naturales: "naturales", Tecnológicos: "tecnologicos" };
 
 function fuenteCapa(id, fichero) {
@@ -199,11 +200,11 @@ function construirActivos() {
   const cont = $("#familias");
   for (const [familia, f] of Object.entries(FAMILIAS)) {
     const g = document.createElement("label"); g.className = "grupo";
-    g.innerHTML = `<input type="checkbox" data-familia="${familia}" checked> <span class="simbolo circulo" style="background:${f.color}"></span>${f.nombre}`;
+    g.innerHTML = `<input type="checkbox" data-familia="${familia}"> <span class="simbolo circulo" style="background:${f.color}"></span>${f.nombre}`;
     cont.appendChild(g);
     for (const [subtipo, [nombre, forma]] of Object.entries(f.subtipos)) {
       const l = document.createElement("label"); l.className = "hoja";
-      l.innerHTML = `<input type="checkbox" data-subtipo="${subtipo}" data-familia="${familia}" checked> ` +
+      l.innerHTML = `<input type="checkbox" data-subtipo="${subtipo}" data-familia="${familia}"> ` +   // todo desmarcado al empezar
         `<span class="simbolo ${forma}" style="background:${f.color};color:${f.color}"></span>${nombre}`;
       cont.appendChild(l);
       icono(`activo-${subtipo}`, f.color, forma);
@@ -242,7 +243,118 @@ function construirActivos() {
     mapa.on("mouseenter", id, () => mapa.getCanvas().style.cursor = "pointer");
     mapa.on("mouseleave", id, () => mapa.getCanvas().style.cursor = "");
   }
-  fetch("/datos/activos.geojson").then((r) => r.json()).then((d) => { activosTodos = d; filtrarActivos(); });
+  fetch("/datos/activos.geojson").then((r) => r.json()).then((d) => { activosTodos = d; filtrarActivos(); resumenActivos(); });
+}
+
+// ----------------------------------------------------------------------------- resumen al arrancar
+// Ventana centrada con los datos del visor: activos por familia y subtipo, capas de
+// peligrosidad, población y, debajo, trenes y tráfico en tiempo real (movilidad.js). Se cierra con su botón y no vuelve.
+$("#datos-inicio-cerrar").onclick = () => $("#datos-inicio").remove();
+
+function resumenActivos() {
+  const caja = $("#datos-activos");
+  if (!caja) return;
+  const n = {};
+  for (const f of activosTodos.features) n[f.properties.subtipo] = (n[f.properties.subtipo] || 0) + 1;
+  const filas = Object.values(FAMILIAS).map((f) => {
+    const subtipos = Object.entries(f.subtipos);
+    const total = subtipos.reduce((s, [k]) => s + (n[k] || 0), 0);
+    return `<tr class="familia"><td><span class="simbolo circulo" style="background:${f.color}"></span>${f.nombre}</td><td class="num">${numero(total)}</td></tr>` +
+      subtipos.map(([k, [nombre, forma]]) => `<tr class="subtipo"><td><span class="simbolo ${forma}" style="background:${f.color};color:${f.color}"></span>` +
+        `${nombre}</td><td class="num">${numero(n[k] || 0)}</td></tr>`).join("");
+  }).join("");
+  caja.innerHTML = `<h3>Activos</h3><table>${filas}<tr class="total"><td>Total en el mapa</td><td class="num">${numero(activosTodos.features.length)}</td></tr></table>` +
+    `<p class="meta">Centros educativos, sanitarios y de atención social de la Comunidad de Madrid (datos.comunidad.madrid).</p>`;
+}
+
+function resumenCapas() {
+  const caja = $("#datos-capas");
+  if (!caja) return;
+  const grupos = [["Naturales", "naturales"], ["Tecnológicos", "tecnológicas"]].map(([g, adj]) => `${CAPAS.filter((c) => c[2] === g).length} ${adj}`);
+  caja.innerHTML = `<h3>Capas de peligrosidad</h3><p><strong>${CAPAS.length}</strong> capas: ${grupos.join(" y ")}, ` +
+    `de 1 (muy baja) a 5 (muy alta), a 5 m.</p><p class="meta">Catálogo de Riesgos Potenciales de la Comunidad de Madrid (IDEM).</p>`;
+}
+
+async function resumenPoblacion() {
+  const caja = $("#datos-poblacion");
+  let d;
+  try { d = await consultar("/api/resumen"); }
+  catch (e) { if (caja) caja.innerHTML = `<h3>Población</h3><p class="error">${html(e.message)}</p>`; return; }
+  if (!$("#datos-poblacion")) return;   // ya se ha cerrado
+  const p = d.poblacion;
+  caja.innerHTML = `<h3>Población</h3><p><strong>${numero(p.total)}</strong> habitantes, ${numero(p.menores_16)} menores de 16 y ` +
+    `${numero(p.mayores_64)} mayores de 64, en las ${numero(d.celdas)} celdas de 1 km que cubren la Comunidad.</p><p class="meta">INE, Censo 2021 en la rejilla europea de 1 km.</p>`;
+}
+resumenCapas();
+resumenPoblacion();
+
+// ----------------------------------------------------------------------------- buscador de municipios
+// Arriba en el centro del mapa, en los tres modos. Sin tildes ni mayúsculas; primero los
+// que empiezan por lo escrito. Al elegir, el mapa encuadra el término; en el análisis basal, además, se abre la celda
+// de 1 km de su capital. En la crisis solo se encuadra (un clic en el mapa movería la alerta)
+const buscador = { municipios: null, resultados: [], activo: -1 };
+const sinTildes = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+// Se piden una sola vez, al arrancar, para que las sugerencias salgan al teclear
+function municipiosBuscador() {
+  if (!buscador.municipios) {
+    buscador.municipios = consultar("/api/municipios").then((l) => l.map((m) => ({ ...m, clave: sinTildes(m.nombre) })));
+    buscador.municipios.catch(() => { buscador.municipios = null; });   // si falla, se reintenta en la siguiente búsqueda
+  }
+  return buscador.municipios;
+}
+municipiosBuscador();
+
+function listaBuscador(abierta) {
+  $("#buscador-lista").hidden = !abierta;
+  $("#buscador-texto").setAttribute("aria-expanded", String(abierta));
+}
+
+function pintarBuscador() {
+  const lista = $("#buscador-lista");
+  lista.innerHTML = buscador.resultados.length
+    ? buscador.resultados.map((m, i) => `<li role="option" data-i="${i}" class="${i === buscador.activo ? "activo" : ""}"` +
+        ` aria-selected="${i === buscador.activo}">${html(m.nombre)}</li>`).join("")
+    : `<li class="vacio">Ningún municipio con ese nombre</li>`;
+  listaBuscador(true);
+}
+
+$("#buscador-texto").addEventListener("input", async (ev) => {
+  const q = sinTildes(ev.target.value.trim());
+  if (!q) { buscador.resultados = []; return listaBuscador(false); }
+  let todos;
+  try { todos = await municipiosBuscador(); } catch (e) { return; }
+  if (sinTildes($("#buscador-texto").value.trim()) !== q) return;   // ya se ha escrito otra cosa
+  const empiezan = todos.filter((m) => m.clave.startsWith(q));
+  const contienen = todos.filter((m) => !m.clave.startsWith(q) && m.clave.includes(q));
+  buscador.resultados = [...empiezan, ...contienen].slice(0, 8);
+  buscador.activo = buscador.resultados.length ? 0 : -1;
+  pintarBuscador();
+});
+
+$("#buscador-texto").addEventListener("keydown", (ev) => {
+  const n = buscador.resultados.length;
+  if (ev.key === "ArrowDown" && n) { buscador.activo = (buscador.activo + 1) % n; pintarBuscador(); ev.preventDefault(); }
+  else if (ev.key === "ArrowUp" && n) { buscador.activo = (buscador.activo - 1 + n) % n; pintarBuscador(); ev.preventDefault(); }
+  else if (ev.key === "Enter" && buscador.activo >= 0) { elegirMunicipio(buscador.resultados[buscador.activo]); ev.preventDefault(); }
+  else if (ev.key === "Escape") listaBuscador(false);
+});
+
+// mousedown y no click: así se elige antes de que el campo pierda el foco y cierre la lista
+$("#buscador-lista").addEventListener("mousedown", (ev) => {
+  const li = ev.target.closest("li[data-i]");
+  if (li) { ev.preventDefault(); elegirMunicipio(buscador.resultados[+li.dataset.i]); }
+});
+$("#buscador-texto").addEventListener("blur", () => listaBuscador(false));
+$("#buscador-texto").addEventListener("focus", () => { if (buscador.resultados.length && $("#buscador-texto").value.trim()) pintarBuscador(); });
+
+function elegirMunicipio(m) {
+  $("#buscador-texto").value = m.nombre;
+  listaBuscador(false);
+  $("#buscador-texto").blur();
+  const [oeste, sur, este, norte] = m.caja;
+  mapa.fitBounds([[oeste, sur], [este, norte]], { padding: 60, maxZoom: 13, duration: 1200 });
+  if (modo === "basal") mostrarCelda({ lng: m.lon, lat: m.lat });
 }
 
 function filtrarActivos() {
@@ -263,11 +375,18 @@ $("#ver-activos").onchange = (ev) => {
 // ----------------------------------------------------------------------------- celda y fichas
 const chip = (n, texto) => `<span class="nivel n${n}">${texto}</span>`;
 
+// Ficha en una ventana arriba a la izquierda del mapa; al cerrarla se quita la celda marcada
 function mostrarFicha(contenido) {
-  $("#ayuda").hidden = true;
-  const ficha = $("#ficha"); ficha.hidden = false; ficha.innerHTML = contenido;
-  requestAnimationFrame(() => ficha.scrollIntoView({ block: "start", behavior: "smooth" }));   // a la vista
+  $("#ficha").innerHTML = contenido;
+  $("#ficha-mapa").hidden = false;
+  $("#ficha-mapa").scrollTop = 0;
 }
+
+function cerrarFicha() {
+  $("#ficha-mapa").hidden = true;
+  if (mapa.getSource("celda")) mapa.getSource("celda").setData({ type: "FeatureCollection", features: [] });
+}
+$("#ficha-cerrar").onclick = cerrarFicha;
 
 async function consultar(url) {
   const r = await fetch(url);
@@ -342,4 +461,5 @@ mapa.on("load", () => {
     if (!sobreElemento(ev.point) && modo === "basal") mostrarCelda(ev.lngLat);
   });
   document.dispatchEvent(new CustomEvent("mapa-listo"));
+  mostrarNombres($("#ver-nombres").checked);   // con todas las capas de nombres ya creadas, también las de los modos
 });

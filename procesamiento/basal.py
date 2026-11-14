@@ -96,7 +96,7 @@ def construir():
     # Activos: niveles, riesgo y celda
     for j, c in enumerate(codigos):
         activos[f"n_{c}"] = niveles_activos[:, j]
-        # El nivel 1 de fondo de incendios y avión no da riesgo (decisión del 13-11-2026)
+        # El nivel 1 de fondo de incendios y avión no da riesgo
         fondo = 1 if c in CON_FONDO else 0
         activos[f"r_{c}"] = [0 if p <= fondo else riesgo(int(p), int(v))
                              for p, v in zip(niveles_activos[:, j], activos["vulnerabilidad_nivel"])]

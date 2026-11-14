@@ -19,8 +19,7 @@ datos/visor/capas/peligrosid_<código>.pmtiles.
 Para los zooms bajos se usa una pirámide reducida en memoria (máximo o nivel más frecuente
 por bloque), de modo que GDAL no tenga que leer la capa completa de 5 m para cada tesela.
 
-Las capas llegan al zoom 15 (3,6 m por píxel en Madrid: la resolución de los 5 m del catálogo; decisión del
-08-11-2026). A esos zooms la mayoría de las teselas están vacías en las capas de ríos, vías o instalaciones: una
+Las capas llegan al zoom 15 (3,6 m por píxel en Madrid: la resolución de los 5 m del catálogo). A esos zooms la mayoría de las teselas están vacías en las capas de ríos, vías o instalaciones: una
 máscara de ocupación por bloques de 32 × 32 píxeles permite saltarlas sin reproyectar. Las 13 capas
 meteorológicas de la prealerta se teselan igual (nivel más frecuente), pero solo hasta el zoom 11, porque son
 zonas suaves.

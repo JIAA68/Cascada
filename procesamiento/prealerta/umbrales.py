@@ -43,7 +43,7 @@ FENOMENOS = {
 OTROS_CODIGOS = {"CO": "Fenómenos costeros", "DP": "Deshielos", "DH": "Deshielos", "AV": "Aludes", "AL": "Aludes",
                  "RI": "Rissaga", "OL": "Olas", "VS": "Viento en superficie (mar)", "GA": "Galerna"}
 
-# Activación de peligros basales (decisión del 08-11-2026): capa del catálogo -> fenómenos que la activan.
+# Activación de peligros basales: capa del catálogo -> fenómenos que la activan.
 # Un activo queda activado si el fenómeno alcanza al menos el nivel amarillo en su municipio y su nivel de
 # peligrosidad en la capa es moderado (3) o superior.
 ACTIVACION = {

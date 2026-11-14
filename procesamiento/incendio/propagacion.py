@@ -11,10 +11,10 @@ aristas que cruzan una celda sin combustible no existen: una franja sin combusti
 El viento y la humedad pueden cambiar cada hora. Mientras no cambian se hace un solo cálculo; al
 cambiar, el grafo se reconstruye y lo quemado sigue ardiendo desde el instante del cambio: cada
 arista que el fuego había empezado a recorrer conserva la fracción ya recorrida, de modo que las
-condiciones nuevas solo actúan hacia delante (corrección del 13-11-2026). El resultado es el
+condiciones nuevas solo actúan hacia delante. El resultado es el
 mapa completo de tiempos de llegada, que el visor reproduce minuto a minuto sin recalcular.
 
-Salto de franjas sin combustible (pavesas; decisión del 10-11-2026): con viento de al menos
+Salto de franjas sin combustible (pavesas): con viento de al menos
 SALTO_VIENTO_KMH, una celda que arde junto a una celda sin combustible puede encender celdas con
 combustible a menos de SALTO_M metros viento abajo (en un cono de ±SALTO_CONO grados), si entre
 ambas hay alguna celda sin combustible: carreteras, avenidas y cortafuegos estrechos. El salto se

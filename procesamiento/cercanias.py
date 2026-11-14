@@ -1,4 +1,4 @@
-"""Horario de Cercanías Madrid de Renfe: estaciones y paso de cada tren por ellas (decisión del 11-11-2026).
+"""Horario de Cercanías Madrid de Renfe: estaciones y paso de cada tren por ellas.
 
 Fuente: Renfe, GTFS estático de Cercanías (data.renfe.com, CC BY 4.0), fichero fomento_transit.zip con
 todos los núcleos y los próximos 30 días (un servicio por día). Se usa el núcleo de Madrid (líneas con
@@ -10,7 +10,7 @@ Salida:
 - datos/procesados/cercanias_pasos.csv.gz: cada paso de un tren por una estación, con su fecha de
   servicio, la línea, el destino y los segundos desde la medianoche de esa fecha (pueden pasar de 24 h).
 
-No se estima cuántas personas lleva cada tren (decisión del 30-10-2026).
+No se estima cuántas personas lleva cada tren.
 
 Uso: python -m procesamiento.cercanias
 """
