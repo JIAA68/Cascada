@@ -266,10 +266,20 @@ function zonaHumo(minuto) {
   for (const z of sim.humo.zonas || []) { if (z.minutos > minuto) break; zona = z; }
   return zona ? { type: "Feature", geometry: { type: "Polygon", coordinates: [zona.coords] }, properties: {} } : vacioFC();
 }
+// La zona solo cambia cada pocos minutos: se manda al mapa solo cuando cambia. Mandarla en cada minuto atasca al mapa,
+// que va reprocesándola con retraso y llega a pintar el humo de minutos antes (cortado)
+let humoPintado = null;
+function pintarHumo(minuto) {
+  let zona = null;
+  for (const z of sim.humo.zonas || []) { if (z.minutos > minuto) break; zona = z; }
+  if (zona === humoPintado && humoPintado !== null) return;
+  humoPintado = zona;
+  mapa.getSource("humo").setData(zonaHumo(minuto));
+}
 
 // ----------------------------------------------------------------------------- carga de una simulación
 function cargarSimulacion(d, mapaLlegada, historico = false) {
-  sim = d; llegada = mapaLlegada;
+  sim = d; llegada = mapaLlegada; humoPintado = null;
   const { filas, columnas, esquinas } = d.ventana;
   lienzo = document.createElement("canvas"); lienzo.width = columnas; lienzo.height = filas;
   dibujo = lienzo.getContext("2d"); pixeles = dibujo.createImageData(columnas, filas);
@@ -444,7 +454,7 @@ function pintar(minuto) {
     }
   }
   dibujo.putImageData(pixeles, 0, 0);
-  mapa.getSource("humo").setData(zonaHumo(minuto));
+  pintarHumo(minuto);
   mapa.setFilter("validacion-focos", ["<=", ["get", "minutos"], minuto]);
   const yaAfectado = ["<=", ["get", "minutos"], minuto];
   mapa.setFilter("afectados", ["all", yaAfectado, ["==", ["get", "clase"], "centro"]]);
@@ -772,7 +782,7 @@ function actualizarCronologiaMapa(minuto) {
   const ultimo = ultimos.at(-1), nuevo = !!ultimo && !cronologiaPintada.endsWith(`${ultimo.min}${ultimo.texto}`);
   cronologiaPintada = clave;
   const hora0 = new Date(sim.ignicion.hora).getTime();
-  $("#cronologia-mapa").innerHTML = `<h4>Cronología</h4><ul>${ultimos.map((s, i) =>
+  $("#cronologia-mapa").innerHTML = `<h4>Últimos sucesos</h4><ul>${ultimos.map((s, i) =>
     `<li class="${s.tipo}${s.clave ? " clave" : ""}${i === ultimos.length - 1 && nuevo ? " nuevo" : ""}"><span class="hora">${hhmm(new Date(hora0 + s.min * 60000))}</span>${s.texto}</li>`).join("")}</ul>`;
 }
 
@@ -846,11 +856,17 @@ function actualizarAvisos(minuto) {
   colocarCartelas(minuto, vigentes, true);
 }
 
-// Cartelas fuera del fuego: cada cartela se aparta de su objetivo lo justo para quedar fuera
-// del área quemada (la de ahora y la de la media hora siguiente), sin pisar las demás cartelas, los objetivos ni los
-// paneles del mapa, preferiblemente del lado contrario al fuego; un conector la une al objetivo. Se mantiene donde
-// está mientras siga valiendo, para que no salte en cada minuto; al mover o acercar el mapa se recolocan todas.
-const CARTELA = { distancias: [30, 55, 85, 120, 170, 230, 300, 400], angulos: 16, margen: 10, paso: 9, antelacion_min: 30 };
+// Cartelas en los espacios vacíos del mapa: nunca sobre el fuego (lo quemado, el frente y lo que arderá en la media
+// hora siguiente), el humo, las zonas Seveso activadas ni los símbolos de lo alcanzado; tampoco sobre otras cartelas,
+// los objetivos, sus conectores ni los paneles del mapa, y sin que su conector cruce otro. Se busca por toda la
+// pantalla, lo más cerca posible del objetivo que quede vacío y preferiblemente del lado contrario al fuego; un
+// conector la une al objetivo. Se mantiene donde está mientras siga en vacío, para que no salte en cada minuto; al
+// mover o acercar el mapa se recolocan todas.
+const CARTELA = { distancias: [30, 55, 85, 120, 170, 230, 300, 380, 470, 570, 680, 800, 950, 1100, 1300], angulos: 24,
+  margen: 10, paso: 9, antelacion_min: 30,
+  tapar: 1000,     // cada celda de 9 px no vacía bajo la cartela cuesta como 1.000 px de distancia: siempre se prefiere el vacío
+  radial: 400,     // salir en sentido contrario al de «hacia fuera del fuego» cuesta como 800 px de distancia
+  holgura_px: 150 };   // una cartela sigue en su sitio si no está más de 150 px más lejos que su hueco vacío más cercano
 let cartelasVigentes = [];
 
 // Prueba en píxeles de pantalla: ¿hay fuego (desde < llegada ≤ minuto) en este punto?
@@ -867,19 +883,88 @@ function fuegoEnPantalla(minuto, desde = -Infinity) {
   };
 }
 
+// Prueba en píxeles de pantalla: ¿está el punto bajo la zona de humo del minuto?
+function humoEnPantalla(minuto) {
+  let zona = null;
+  for (const z of sim.humo.zonas || []) { if (z.minutos > minuto) break; zona = z; }
+  if (!zona) return () => false;
+  const anillo = zona.coords.map((c) => mapa.project(c));
+  const xs = anillo.map((q) => q.x), ys = anillo.map((q) => q.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  return (x, y) => {
+    if (x < x0 || x > x1 || y < y0 || y > y1) return false;
+    let dentro = false;
+    for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
+      const a = anillo[i], b = anillo[j];
+      if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) dentro = !dentro;
+    }
+    return dentro;
+  };
+}
+
+// Espacio vacío de la pantalla en el minuto: rejilla de celdas de CARTELA.paso píxeles marcadas como llenas si tienen
+// fuego (quemado o por arder en la media hora siguiente), humo, zona Seveso activada, franja de la conducción o el
+// símbolo de algo ya alcanzado. lleno(r) cuenta en tiempo constante (tabla de sumas) las celdas llenas del recuadro r.
+function espacioVacio(minuto, ancho, alto) {
+  const P = CARTELA.paso, gw = Math.ceil(ancho / P), gh = Math.ceil(alto / P);
+  const celdas = new Uint8Array(gw * gh);
+  // El fuego, con la media hora siguiente (para que no se le eche encima enseguida); el humo, el que se ve: el cono crece
+  // tan deprisa con el viento que el de media hora después ocuparía casi todo el espacio vacío
+  const hayFuego = fuegoEnPantalla(minuto + CARTELA.antelacion_min), hayHumo = humoEnPantalla(minuto);
+  // Polígonos y círculos, como funciones de punto con su recuadro para descartar rápido
+  const poligonos = [];
+  const anillo = (coords) => {
+    const a = coords.map((c) => mapa.project(c)), xs = a.map((q) => q.x), ys = a.map((q) => q.y);
+    poligonos.push({ x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys), dentro: (x, y) => {
+      let d = false;
+      for (let i = 0, j = a.length - 1; i < a.length; j = i++)
+        if ((a[i].y > y) !== (a[j].y > y) && x < (a[j].x - a[i].x) * (y - a[i].y) / (a[j].y - a[i].y) + a[i].x) d = !d;
+      return d;
+    } });
+  };
+  const circulo_ = (lon, lat, radio_m) => {
+    const c = mapa.project([lon, lat]), e = mapa.project([lon + radio_m / (111320 * Math.cos((lat * Math.PI) / 180)), lat]);
+    const r = Math.hypot(e.x - c.x, e.y - c.y);
+    poligonos.push({ x0: c.x - r, x1: c.x + r, y0: c.y - r, y1: c.y + r, dentro: (x, y) => Math.hypot(x - c.x, y - c.y) <= r });
+  };
+  for (const i of sim.cascada.instalaciones_seveso) if (i.minutos <= minuto) circulo_(i.lon, i.lat, i.radio_alerta_m);
+  const c = sim.cascada.conduccion;
+  for (const f of (c && c.franja) || []) if (f.minutos <= minuto && (f.hasta == null || f.hasta > minuto)) for (const a of f.coords) anillo(a);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+    const x = i * P + P / 2, y = j * P + P / 2;
+    if (hayFuego(x, y) || hayHumo(x, y) || poligonos.some((p) => x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1 && p.dentro(x, y)))
+      celdas[j * gw + i] = 1;
+  }
+  // Símbolos de lo ya alcanzado (centros, estaciones, trenes, entradas en municipios…): unos 10 px alrededor
+  for (const f of afectadosBase) if (f.properties.minutos <= minuto) {
+    const q = mapa.project(f.geometry.coordinates);
+    for (let j = Math.floor((q.y - 10) / P); j <= Math.floor((q.y + 10) / P); j++)
+      for (let i = Math.floor((q.x - 10) / P); i <= Math.floor((q.x + 10) / P); i++)
+        if (i >= 0 && j >= 0 && i < gw && j < gh) celdas[j * gw + i] = 1;
+  }
+  // Tabla de sumas acumuladas
+  const W = gw + 1, suma = new Float64Array(W * (gh + 1));
+  for (let j = 0; j < gh; j++) { let fila = 0;
+    for (let i = 0; i < gw; i++) { fila += celdas[j * gw + i]; suma[(j + 1) * W + i + 1] = suma[j * W + i + 1] + fila; } }
+  const lim = (v, n) => Math.min(Math.max(v, 0), n);
+  return { lleno: (r) => {
+    const i0 = lim(Math.floor(r.x0 / P), gw), i1 = lim(Math.ceil(r.x1 / P), gw), j0 = lim(Math.floor(r.y0 / P), gh), j1 = lim(Math.ceil(r.y1 / P), gh);
+    return suma[j1 * W + i1] - suma[j0 * W + i1] - suma[j1 * W + i0] + suma[j0 * W + i0];
+  } };
+}
+
 function colocarCartelas(minuto, vigentes = cartelasVigentes, mantener = false) {
   vigentes = vigentes.filter((a) => globos.has(a.id));   // solo las que tienen su cartela creada
   cartelasVigentes = vigentes;
   if (!sim || modo !== "crisis" || !vigentes.length) return;
   const lienzoMapa = mapa.getContainer(), base = lienzoMapa.getBoundingClientRect();
   const ancho = lienzoMapa.clientWidth, alto = lienzoMapa.clientHeight;
-  // Las cartelas evitan el frente activo y lo que arde en la próxima media hora, pero pueden ir sobre lo ya quemado,
-  // para quedar cerca de su objetivo
-  const hayFuego = fuegoEnPantalla(minuto + CARTELA.antelacion_min, minuto - FRENTE_MIN);
+  const vacio = espacioVacio(minuto, ancho, alto);
   const solapa = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
   // Paneles sobre el mapa y los propios objetivos (un círculo de 12 px alrededor de cada uno)
-  const ocupado = [...document.querySelectorAll("#cronologia-mapa, #esalert-mapa, #reproductor, #comunicaciones, .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left")]
-    .filter((e) => !e.hidden && e.offsetParent).map((e) => e.getBoundingClientRect())
+  // (y cualquier elemento marcado con data-tapa-mapa, como un rótulo puesto encima al grabar un vídeo)
+  const ocupado = [...document.querySelectorAll("#cronologia-mapa, #esalert-mapa, #reproductor, #comunicaciones, #buscador, [data-tapa-mapa], .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left")]
+    .filter((e) => !e.hidden && e.getClientRects().length).map((e) => e.getBoundingClientRect())   // también los fijos
     .filter((r) => r.width && r.height)
     .map((r) => ({ x0: r.left - base.left, y0: r.top - base.top, x1: r.right - base.left, y1: r.bottom - base.top }));
   const puntos = vigentes.map((a) => mapa.project([a.lon, a.lat]));
@@ -890,7 +975,6 @@ function colocarCartelas(minuto, vigentes = cartelasVigentes, mantener = false) 
   for (let i = 0; i < llegada.length; i += 7) if (llegada[i] <= minuto) { sc += i % columnas; sf += Math.floor(i / columnas); n++; }
   const centro = mapa.project(n ? lonlat(sc / n + 0.5, sf / n + 0.5) : lonlat(columnas / 2, filas / 2));
 
-  const conectores = [], cartelasPuestas = [];
   // ¿Pasa el segmento [x0, y0, x1, y1] por el recuadro? (muestreo cada 6 px, sin los 14 px junto al objetivo)
   const cruza = ([x0, y0, x1, y1], r) => {
     const l = Math.hypot(x1 - x0, y1 - y0);
@@ -907,59 +991,115 @@ function colocarCartelas(minuto, vigentes = cartelasVigentes, mantener = false) 
     const d3 = giro(ax, ay, bx, by, cx, cy), d4 = giro(ax, ay, bx, by, dx, dy);
     return d1 * d2 < 0 && d3 * d4 < 0;
   };
-  vigentes.forEach((a, k) => {
-    const caja = globos.get(a.id).getElement(), el = caja.querySelector(".globo-aviso"), p = puntos[k];
-    const w = el.offsetWidth, h = el.offsetHeight, m = CARTELA.margen;
-    const rect = (dx, dy) => ({ x0: p.x + dx - w / 2 - m, y0: p.y + dy - h / 2 - m, x1: p.x + dx + w / 2 + m, y1: p.y + dy + h / 2 + m });
-    const conFuego = (r) => {
-      let c = 0;
-      for (let y = r.y0; y <= r.y1; y += CARTELA.paso) for (let x = r.x0; x <= r.x1; x += CARTELA.paso) if (hayFuego(x, y)) c++;
-      return c;
-    };
-    const coste = (dx, dy) => {
-      const r = rect(dx, dy), propio = [p.x, p.y, p.x + dx, p.y + dy];
-      const fuera = r.x0 < 4 || r.y0 < 4 || r.x1 > ancho - 4 || r.y1 > alto - 4;
-      const choques = ocupado.filter((o) => solapa(o, r)).length
-        + conectores.filter((c) => cruza(c, r)).length              // la cartela no tapa conectores ya puestos
-        + cartelasPuestas.filter((o) => cruza(propio, o)).length   // ni su conector cruza cartelas ya puestas
-        + conectores.filter((c) => seCruzan(c, propio)).length;     // ni otros conectores
-      // Nunca fuera del mapa ni encima de otra cartela o panel; el fuego no lo impide, pero pesa: con viento
-      // fuerte el frente es tan ancho que, si se evitara del todo, la cartela quedaría muy lejos
-      return { malo: (fuera ? 1000 : 0) + 100 * choques, fuego: Math.min(conFuego(r), 200), r, propio };
-    };
-    let elegido = null;
-    if (mantener && caja.dataset.dx != null) {
-      const c = coste(+caja.dataset.dx, +caja.dataset.dy);
-      if (!c.malo && c.fuego < 15) elegido = { dx: +caja.dataset.dx, dy: +caja.dataset.dy, r: c.r };
-    }
-    if (!elegido) {
-      let ux = p.x - centro.x, uy = p.y - centro.y;
-      const lu = Math.hypot(ux, uy);
-      if (lu < 1) { ux = 0; uy = -1; } else { ux /= lu; uy /= lu; }
-      let mejor = null;
-      for (const d of CARTELA.distancias) {
-        for (let i = 0; i < CARTELA.angulos; i++) {
-          const ang = (2 * Math.PI * i) / CARTELA.angulos, cx = Math.cos(ang), cy = Math.sin(ang);
-          // El borde de la cartela queda a unos d píxeles del objetivo
-          // y, si se sale del mapa, se corre hacia dentro (sin tapar el objetivo: los objetivos están en «ocupado»)
-          const lim = (v, a, b) => Math.min(Math.max(v, a), b);
-          const dx = Math.round(lim(cx * (w / 2 + d), 5 + m + w / 2 - p.x, ancho - 5 - m - w / 2 - p.x));
-          const dy = Math.round(lim(cy * (h / 2 + d), 5 + m + h / 2 - p.y, alto - 5 - m - h / 2 - p.y));
-          const c = coste(dx, dy);
-          // Cerca del objetivo, del lado contrario al fuego y tapando poco frente (cada muestra de 9 px, 2 px de distancia)
-          const puntos_ = c.malo * 10000 + Math.hypot(dx, dy) + 80 * (1 - (cx * ux + cy * uy)) + 2 * c.fuego;
-          if (!mejor || puntos_ < mejor.puntos) mejor = { dx, dy, r: c.r, puntos: puntos_ };
-        }
-      }
-      elegido = mejor;
-    }
-    ocupado.push(elegido.r); cartelasPuestas.push(elegido.r);
-    conectores.push([p.x, p.y, p.x + elegido.dx, p.y + elegido.dy]);
-    caja.dataset.dx = elegido.dx; caja.dataset.dy = elegido.dy;
-    el.style.left = `${elegido.dx}px`; el.style.top = `${elegido.dy}px`;
-    const linea = caja.querySelector("line");
-    linea.setAttribute("x2", elegido.dx); linea.setAttribute("y2", elegido.dy);
+  const cajas = vigentes.map((a) => {
+    const caja = globos.get(a.id).getElement(), el = caja.querySelector(".globo-aviso");
+    return { caja, el, w: el.offsetWidth, h: el.offsetHeight };
   });
+  // Dirección hacia fuera de cada objetivo: del centro del fuego al objetivo. Si cada conector sale en su dirección,
+  // los conectores son radios del mismo centro y no se cruzan
+  const fuera_ = puntos.map((p) => {
+    const ux = p.x - centro.x, uy = p.y - centro.y, l = Math.hypot(ux, uy);
+    return l < 1 ? [0, 1] : [ux / l, uy / l];
+  });
+  const m = CARTELA.margen, lim = (v, a, b) => Math.min(Math.max(v, a), b);
+
+  const indices = vigentes.map((_, k) => k);
+  // Posiciones candidatas de cada cartela: anillos de distancias y ángulos alrededor del objetivo. El borde de la cartela
+  // queda a unos d píxeles del objetivo y, si se sale del mapa, se corre hacia dentro (sin tapar el objetivo: los
+  // objetivos están en «ocupado»)
+  const candidatos = indices.map((k) => {
+    const p = puntos[k], { w, h } = cajas[k], lista = [];
+    for (const d of CARTELA.distancias) for (let i = 0; i < CARTELA.angulos; i++) {
+      const ang = (2 * Math.PI * i) / CARTELA.angulos;
+      lista.push([Math.round(lim(Math.cos(ang) * (w / 2 + d), 5 + m + w / 2 - p.x, ancho - 5 - m - w / 2 - p.x)),
+        Math.round(lim(Math.sin(ang) * (h / 2 + d), 5 + m + h / 2 - p.y, alto - 5 - m - h / 2 - p.y))]);
+    }
+    return lista;
+  });
+  // Coste de poner la cartela k en (dx, dy) con otras ya puestas ({r, seg} de cada una). Por este orden: nunca fuera del
+  // mapa ni encima de otra cartela, objetivo o panel, ni tapando un conector, ni con su conector cruzando otro o
+  // pasando por otra cartela; después, solo espacio vacío; después, hacia fuera del fuego y cerca del objetivo
+  const coste = (k, dx, dy, puestas) => {
+    const p = puntos[k], { w, h } = cajas[k], [ux, uy] = fuera_[k];
+    const r = { x0: p.x + dx - w / 2 - m, y0: p.y + dy - h / 2 - m, x1: p.x + dx + w / 2 + m, y1: p.y + dy + h / 2 + m };
+    const seg = [p.x, p.y, p.x + dx, p.y + dy];
+    const fuera = r.x0 < 4 || r.y0 < 4 || r.x1 > ancho - 4 || r.y1 > alto - 4;
+    let choques = ocupado.filter((o) => solapa(o, r)).length;
+    for (const o of puestas) choques += solapa(o.r, r) + cruza(o.seg, r) + cruza(seg, o.r) + seCruzan(o.seg, seg);
+    const malo = (fuera ? 1000 : 0) + 100 * choques, tapado = vacio.lleno(r), l = Math.hypot(dx, dy) || 1;
+    return { dx, dy, r, seg, malo, tapado, puntos: malo * 10000 + CARTELA.tapar * tapado + l + CARTELA.radial * (1 - (dx * ux + dy * uy) / l) };
+  };
+  const mejorSitio = (k, puestas) => {
+    let e = null;
+    for (const [dx, dy] of candidatos[k]) { const c = coste(k, dx, dy, puestas); if (!e || c.puntos < e.puntos) e = c; }
+    return e;
+  };
+  // Huecos vacíos de cada cartela sin contar las demás: cuántos tiene y a qué distancia está el más cercano
+  const huecos = indices.map(() => 0), cercania = indices.map(() => Infinity);
+  for (const k of indices) for (const [dx, dy] of candidatos[k]) {
+    const c = coste(k, dx, dy, []);
+    if (!c.malo && !c.tapado) { huecos[k]++; cercania[k] = Math.min(cercania[k], Math.hypot(dx, dy)); }
+  }
+  const sinK = (puestas, k) => [...puestas].filter(([j]) => j !== k).map(([, e]) => e);
+
+  // Coloca las cartelas una a una en el orden dado, sin tocar la página. Una cartela se queda donde estaba si sigue en
+  // vacío, sin choques y no mucho más lejos que su hueco vacío más cercano
+  const intentar = (orden) => {
+    const puestas = new Map();
+    let movidas = 0;
+    for (const k of orden) {
+      const caja = cajas[k].caja;
+      let e = null;
+      if (mantener && caja.dataset.dx != null) {
+        const c = coste(k, +caja.dataset.dx, +caja.dataset.dy, [...puestas.values()]);
+        if (!c.malo && !c.tapado && Math.hypot(c.dx, c.dy) <= cercania[k] + CARTELA.holgura_px) e = c;
+      }
+      if (!e) { e = mejorSitio(k, [...puestas.values()]); movidas++; }
+      puestas.set(k, e);
+    }
+    return { puestas, movidas, ...valorar(puestas) };
+  };
+  // Coste de una colocación completa: cada cartela frente a todas las demás
+  const valorar = (puestas) => {
+    let total = 0, limpio = true;
+    for (const [k, e] of puestas) {
+      const c = coste(k, e.dx, e.dy, sinK(puestas, k));
+      total += c.puntos; limpio = limpio && !c.malo && !c.tapado;
+    }
+    return { total, limpio };
+  };
+  // Varios órdenes; se queda el de menor coste. Primero las que menos huecos vacíos tienen, para que las otras no se
+  // los quiten; después, por hora de llegada, alrededor del fuego, de dentro afuera y de fuera adentro, y unos cuantos
+  // órdenes al azar, siempre los mismos (semilla fija) para que las cartelas no salten de un minuto a otro
+  const angulo = (k) => Math.atan2(puntos[k].y - centro.y, puntos[k].x - centro.x);
+  const alCentro = (k) => Math.hypot(puntos[k].x - centro.x, puntos[k].y - centro.y);
+  let semilla = 12345;
+  const azar = () => ((semilla = (semilla * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const barajar = (a) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(azar() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+  const ordenes = [[...indices].sort((i, j) => huecos[i] - huecos[j]), indices, [...indices].sort((i, j) => angulo(i) - angulo(j)),
+    [...indices].sort((i, j) => alCentro(i) - alCentro(j)), [...indices].sort((i, j) => alCentro(j) - alCentro(i))];
+  if (indices.length > 2) for (let i = 0; i < 12; i++) ordenes.push(barajar(indices));
+  let mejor = null;
+  for (const orden of ordenes) {
+    const intento = intentar(orden);
+    if (!mejor || intento.total < mejor.total) mejor = intento;
+    if (mejor.limpio && !mejor.movidas) break;   // todas siguen en su sitio, en vacío y sin choques
+  }
+  // Repaso: si algo se ha movido, cada cartela, con todas las demás ya puestas, busca un sitio mejor
+  if (mejor.movidas) {
+    for (let ronda = 0; ronda < 2; ronda++) for (const k of indices) {
+      const otras = sinK(mejor.puestas, k), actual = mejor.puestas.get(k), nueva = mejorSitio(k, otras);
+      if (nueva.puntos < coste(k, actual.dx, actual.dy, otras).puntos - 1) mejor.puestas.set(k, nueva);
+    }
+  }
+  mejor.posiciones = mejor.puestas;
+  for (const [k, e] of mejor.posiciones) {
+    const { caja, el } = cajas[k];
+    caja.dataset.dx = e.dx; caja.dataset.dy = e.dy;
+    el.style.left = `${e.dx}px`; el.style.top = `${e.dy}px`;
+    const linea = caja.querySelector("line");
+    linea.setAttribute("x2", e.dx); linea.setAttribute("y2", e.dy);
+  }
 }
 
 function reproducir(si) {
