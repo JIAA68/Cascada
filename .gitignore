@@ -1,0 +1,16 @@
+# Claves y configuración local
+.env
+
+# Datos descargados y cachés de servicios (se regeneran; el registro sí se publica)
+datos/brutos/
+datos/cache/
+
+# Resultados intermedios, simulaciones y ficheros del visor: se regeneran con la cadena de datos.
+# Entre ellos, la lista de instalaciones Seveso deducida del catálogo, que no se publica (uso responsable)
+datos/procesados/
+datos/visor/
+
+# Entorno de Python del proyecto y cachés
+.venv/
+__pycache__/
+.pytest_cache/

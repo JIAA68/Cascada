@@ -1,0 +1,259 @@
+:root {
+  --fondo: #f6f5f2;
+  --texto: #1f2328;
+  --suave: #5c6670;
+  --borde: #d9d6cf;
+  --panel: #ffffff;
+  --acento: #b3261e;
+  --educativos: #2f6fd1;
+  --sanitarios: #1f9d6b;
+  --atencion_social: #7b4fc9;
+  --n1: #fad23c; --n2: #f5a014; --n3: #eb690f; --n4: #d22819; --n5: #7d001e;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 14px/1.45 system-ui, "Segoe UI", Roboto, sans-serif;
+  color: var(--texto); background: var(--fondo);
+  display: grid; grid-template-rows: auto 1fr auto;
+}
+header { display: flex; align-items: baseline; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--borde); flex-wrap: wrap; }
+h1 { margin: 0; font-size: 20px; }
+.subtitulo { color: var(--suave); }
+.botones { display: flex; }
+.botones:first-of-type { margin-left: auto; }
+/* Mostrar u ocultar: fila de botones arriba del panel derecho, en los dos modos */
+#elementos .elemento { display: block; margin: 4px 0 2px; }
+.botones button { border: 1px solid var(--borde); background: var(--panel); padding: 4px 10px; cursor: pointer; }
+.botones button.activo { background: var(--texto); color: #fff; }
+.botones button:disabled { color: var(--suave); cursor: default; }
+main { display: grid; grid-template-columns: 1fr 380px; min-height: 0; }
+#mapa { position: relative; width: 100%; height: 100%; min-height: 300px; }
+#panel { overflow-y: auto; padding: 12px 16px; background: var(--panel); border-left: 1px solid var(--borde); }
+/* Pestaña para plegar el panel lateral, en el borde derecho del mapa */
+#plegar-panel { position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 6; width: 22px; height: 56px;
+  padding: 0; border: 1px solid var(--borde); border-right: 0; border-radius: 6px 0 0 6px; background: var(--panel);
+  color: var(--texto); font-size: 20px; line-height: 1; cursor: pointer; box-shadow: -1px 0 3px rgba(0,0,0,.12); }
+#plegar-panel:hover { background: var(--fondo); }
+main.sin-panel { grid-template-columns: 1fr; }
+main.sin-panel #panel { display: none; }
+footer { font-size: 11px; color: var(--suave); padding: 4px 16px; border-top: 1px solid var(--borde); }
+
+details { border-bottom: 1px solid var(--borde); padding: 6px 0; }
+summary { font-weight: 600; cursor: pointer; }
+.grupo { display: block; margin: 6px 0 2px; font-weight: 600; }
+.hoja { display: block; margin-left: 18px; }
+label { cursor: pointer; }
+.simbolo { display: inline-block; width: 11px; height: 11px; vertical-align: -1px; margin-right: 5px; }
+.simbolo.circulo { border-radius: 50%; }
+.simbolo.triangulo { width: 0; height: 0; background: none !important; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 11px solid currentColor; }
+.simbolo.rombo { transform: rotate(45deg) scale(.8); }
+.leyenda span[class^="n"] { display: inline-block; width: 14px; height: 10px; margin: 0 3px 0 8px; vertical-align: middle; }
+.leyenda .aviso-capas { display: block; margin-top: 4px; }
+.nota { color: var(--suave); font-size: 12px; margin: 6px 0 0; }
+
+h2 { font-size: 16px; margin: 6px 0 8px; }
+h3 { font-size: 14px; margin: 14px 0 6px; }
+.cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+.cifras div { background: var(--fondo); padding: 6px; text-align: center; }
+.cifras strong { display: block; font-size: 18px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { text-align: left; padding: 3px 4px; border-bottom: 1px solid #eee; vertical-align: top; }
+th { font-weight: 600; color: var(--suave); }
+td.num { text-align: right; white-space: nowrap; }
+.nivel { display: inline-block; padding: 0 6px; border-radius: 3px; font-size: 12px; white-space: nowrap; }
+.n1 { background: var(--n1); } .n2 { background: var(--n2); } .n3 { background: var(--n3); }
+.n4 { background: var(--n4); color: #fff; } .n5 { background: var(--n5); color: #fff; }
+ul.activos { list-style: none; padding: 0; margin: 0; }
+ul.activos li { padding: 4px 0; border-bottom: 1px solid #eee; cursor: pointer; display: flex; gap: 6px; align-items: baseline; }
+ul.activos li:hover { background: #f3f3f3; }
+ul.activos .nombre { flex: 1; }
+.error { color: var(--acento); }
+button.enlace { background: none; border: 0; color: var(--educativos); cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
+.maplibregl-popup-content { font: 13px system-ui, sans-serif; padding: 8px 10px; }
+
+@media (max-width: 800px) {
+  main { grid-template-columns: 1fr; grid-template-rows: 55vh auto; }
+  #panel { border-left: 0; border-top: 1px solid var(--borde); }
+  #plegar-panel { display: none; }
+  main.sin-panel #panel { display: block; }
+}
+
+/* ---------------------------------------------------------------- gestión de crisis */
+button.principal { background: var(--acento); color: #fff; border: 0; padding: 6px 12px; cursor: pointer; font: inherit; }
+button.principal:disabled { opacity: .6; cursor: default; }
+#alerta label { display: block; margin: 6px 0; }
+#alerta input[type=number] { width: 64px; }
+fieldset { border: 1px solid var(--borde); margin: 8px 0; padding: 4px 10px 8px; }
+legend { font-weight: 600; }
+#estado { margin: 6px 0; }
+#estado.error { color: var(--acento); }
+.meta { color: var(--suave); font-size: 12px; }
+.hora { font-variant-numeric: tabular-nums; color: var(--suave); min-width: 46px; }
+ul.activos li.pendiente { opacity: .55; }
+ul.activos li .marca { font-size: 11px; padding: 0 5px; border-radius: 3px; color: #fff; background: var(--acento); white-space: nowrap; }
+ul.activos li .marca.derivada { background: #d9772b; }
+ul.activos li .marca.humo { background: #6b6b6b; }
+h4 { font-size: 13px; margin: 10px 0 4px; }
+
+/* ---------------------------------------------------------------- trenes y tráfico en tiempo real */
+#movilidad-leyenda { position: absolute; left: 10px; top: 10px; z-index: 4; max-width: 300px; font-size: 12px;
+  background: rgba(255,255,255,.94); border: 1px solid var(--borde); border-radius: 6px; padding: 6px 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+#movilidad-leyenda div + div { margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; }
+.semaforo, .tren { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 3px 0 6px;
+  vertical-align: -1px; border: 1px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.semaforo:first-child, .tren:first-child { margin-left: 0; }
+.tren { background: #2b2b2b; margin-right: 6px; }
+.senal { display: inline-block; width: 12px; height: 12px; margin: 0 4px 0 6px; vertical-align: -2px; }
+.senal.corte { border-radius: 50%; background: linear-gradient(#d1121b 40%, #fff 40% 60%, #d1121b 60%); }
+.senal.peligro { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent;
+  border-bottom: 12px solid #d1121b; }
+ul.activos .senal, ul.activos .semaforo { margin-left: 0; }
+
+#reproductor { position: absolute; left: 12px; right: 12px; bottom: 28px; z-index: 5; background: rgba(255,255,255,.94);
+  border: 1px solid var(--borde); border-radius: 6px; padding: 8px 12px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+#reproductor .controles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#reproductor button { border: 1px solid var(--borde); background: #fff; cursor: pointer; padding: 2px 8px; font: inherit; }
+#reproductor .reloj { font-weight: 600; font-variant-numeric: tabular-nums; margin-left: 4px; }
+#reproductor .rep-pausa { font-size: 12px; white-space: nowrap; display: flex; align-items: center; gap: 3px; }
+#reproductor .cortes { margin-left: auto; display: flex; gap: 4px; }
+#reproductor .cortes button { font-size: 12px; padding: 1px 6px; }
+#reproductor input[type=range] { width: 100%; margin: 8px 0 0; }
+.leyenda-crisis span { display: inline-block; width: 14px; height: 10px; margin: 0 3px 0 8px; vertical-align: middle; border: 1px solid rgba(0,0,0,.2); }
+
+#comunicaciones .rrss, #comunicaciones .esalert { border: 1px solid var(--borde); border-radius: 8px; margin: 8px 0; overflow: hidden; }
+#comunicaciones .cabecera { background: var(--fondo); padding: 4px 10px; font-size: 12px; color: var(--suave); font-weight: 600; }
+#comunicaciones p { margin: 0; padding: 8px 10px; white-space: pre-wrap; font-size: 13px; }
+#comunicaciones .esalert { border-color: #b3261e; }
+#comunicaciones .esalert .cabecera { background: #b3261e; color: #fff; }
+#comunicaciones .esalert p { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+
+/* ---------------------------------------------------------------- prealerta */
+.pa0 { background: #8fcf8f; } .pa1 { background: #f5d000; } .pa2 { background: #f28c00; } .pa3 { background: #d1121b; color: #fff; }
+.dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 8px 0 4px; }
+.dias .dia { border: 1px solid var(--borde); background: #fff; cursor: pointer; padding: 4px 2px; font: inherit; font-size: 11px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 4px; line-height: 1.2; }
+.dias .dia.activo { border-color: var(--texto); background: var(--fondo); font-weight: 600; }
+.dias .dia .punto, .dia-mini .punto { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--c); border: 1px solid rgba(0,0,0,.25); }
+.dias .dia .fecha, .dias .dia .cuenta { color: var(--suave); }
+.semana { display: flex; gap: 4px; margin: 6px 0; }
+.dia-mini { border: 1px solid var(--borde); background: #fff; cursor: pointer; font: inherit; font-size: 11px; padding: 2px 5px;
+  display: flex; align-items: center; gap: 4px; border-radius: 4px; }
+.dia-mini.activo { border-color: var(--texto); font-weight: 600; }
+.origen { font-size: 11px; color: var(--suave); border: 1px solid var(--borde); border-radius: 3px; padding: 0 4px; white-space: nowrap; }
+.origen.aemet { color: #fff; background: #1f5f99; border-color: #1f5f99; }
+.leyenda-pa { font-size: 12px; color: var(--suave); margin: 6px 0 0; }
+.leyenda-pa span { display: inline-block; width: 14px; height: 10px; margin: 0 3px 0 6px; vertical-align: middle; border: 1px solid rgba(0,0,0,.2); }
+.leyenda-pa .anillo { width: 12px; height: 12px; border-radius: 50%; background: none; border: 3px solid #f28c00; }
+.leyenda-pa .raya { height: 0; border: 0; border-top: 2px dashed #1f2328; }
+ul.avisos { list-style: none; padding: 0; margin: 0; }
+ul.avisos li { padding: 4px 0; border-bottom: 1px solid #eee; }
+.cabecera-municipio { display: flex; align-items: baseline; justify-content: space-between; }
+tr.verde td { color: var(--suave); }
+#prealerta-estado button { border: 1px solid var(--borde); background: #fff; cursor: pointer; padding: 3px 10px; font: inherit; }
+.actualizando::before { content: ""; display: inline-block; width: 10px; height: 10px; border: 2px solid var(--suave); border-top-color: transparent;
+  border-radius: 50%; margin-right: 6px; animation: girar 1s linear infinite; vertical-align: -1px; }
+@keyframes girar { to { transform: rotate(360deg); } }
+.grupo .meta { font-weight: 400; }
+
+/* Validación con un caso real */
+.leyenda-crisis .linea-validacion { display: inline-block; width: 22px; height: 0; border: none; border-top: 3px dashed #111; background: none; vertical-align: middle; margin: 0 4px 0 8px; }
+.leyenda-crisis .foco-validacion { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ffd400; border: 1.5px solid #111; vertical-align: middle; margin: 0 4px 0 8px; }
+table.comparacion { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 0.4rem 0 1rem; }
+table.comparacion th, table.comparacion td { text-align: left; vertical-align: top; padding: 4px 6px; border-bottom: 1px solid #e3e3e3; }
+table.comparacion thead th { font-weight: 600; border-bottom: 2px solid #ccc; }
+table.comparacion tbody th { font-weight: 500; width: 34%; }
+
+/* Resultado sin propagación */
+.aviso { background: #fff4e5; border-left: 3px solid #d9772b; padding: 6px 8px; margin: 0.4rem 0; }
+
+/* Cartela de aviso apartada de su objetivo, con conector (decisión del 12-11-2026) */
+/* Urgencia (decisión del 12-11-2026): a más de una hora, gris azulado (el ámbar se confundía con las conducciones, 13-11-2026); a menos, naranja; alcanzado, rojo. Franja: color del tipo */
+.cartela { --c-borde: #5b6b80; --c-fondo: #fff; --c-texto: #1b1b1b; --c-cuenta: #3f4a5a; width: 0; height: 0; overflow: visible; }
+.cartela.cerca { --c-borde: #e65c00; --c-fondo: #ffe3cc; --c-cuenta: #9a3a00; }
+.cartela.alcanzado { --c-borde: #7a140f; --c-fondo: #b3261e; --c-texto: #fff; --c-cuenta: #fff; }
+.cartela .conector { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.cartela .conector line { stroke: var(--c-borde); stroke-width: 2.5; }
+.cartela .conector circle { fill: #fff; stroke: var(--c-borde); stroke-width: 2.5; }
+.globo-aviso { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); width: max-content; max-width: 230px;
+  background: var(--c-fondo); color: var(--c-texto); border: 2px solid var(--c-borde); border-radius: 6px; overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3); font-size: 12px; line-height: 1.3; cursor: pointer; }
+.globo-aviso .franja { padding: 2px 8px; color: #fff; font-size: 11px; font-weight: 600; }
+.globo-aviso .franja .simbolo { background: #fff !important; color: #fff !important; }
+.globo-aviso .franja .linea-via { border-color: #fff !important; }
+.globo-aviso .cuerpo { padding: 3px 8px 4px; }
+.globo-aviso .nombre { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; }
+.globo-aviso .cuenta { display: block; color: var(--c-cuenta); }
+
+/* Cronología de sucesos (decisión del 11-11-2026) */
+#cronologia-mapa { position: absolute; top: 10px; right: 50px; z-index: 5; width: 300px; max-width: calc(100% - 70px); max-height: 45%;
+  overflow: hidden; background: rgba(255,255,255,.95); border: 1px solid var(--borde); border-radius: 6px; padding: 6px 8px;
+  font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+/* ES-Alert sobre el mapa, con aspecto de aviso en un móvil (decisión del 13-11-2026) */
+#esalert-mapa { position: absolute; top: 10px; left: 10px; z-index: 5; width: 280px; background: #111; border-radius: 22px;
+  padding: 8px 8px 12px; box-shadow: 0 4px 14px rgba(0,0,0,.35); color: #fff; font-size: 12px; }
+#esalert-mapa .barra { display: flex; justify-content: space-between; padding: 2px 10px 6px; font-size: 11px; color: #ccc; }
+#esalert-mapa .tarjeta { background: #2b2b2b; border-radius: 14px; padding: 8px 10px; border: 2px solid transparent; transition: border-color .3s; }
+#esalert-mapa .titulo { font-weight: 700; color: #ffb4a9; margin-bottom: 4px; }
+#esalert-mapa p { margin: 0; white-space: pre-wrap; line-height: 1.35; }
+#esalert-mapa.nueva .tarjeta { border-color: #e53935; background: #3a1f1d; }
+#cronologia-mapa h4 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #555; }
+#cronologia-mapa ul { list-style: none; margin: 0; padding: 0; }
+#cronologia-mapa li { padding: 2px 0 2px 7px; margin-bottom: 3px; border-left: 3px solid #888; line-height: 1.3; }
+#cronologia-mapa li .hora { font-weight: 600; font-variant-numeric: tabular-nums; margin-right: 5px; }
+#cronologia-mapa li.nuevo { animation: suceso-nuevo 1.5s ease-out; }
+@keyframes suceso-nuevo { from { background: #ffd9b0; } to { background: transparent; } }
+#cronologia-mapa li.inicio { border-left-color: #111; }
+#cronologia-mapa li.municipios { border-left-color: #6b6b6b; }
+#cronologia-mapa li.centros { border-left-color: #2f6fb3; }
+#cronologia-mapa li.cascada { border-left-color: #d9772b; }
+#cronologia-mapa li.otros { border-left-color: #9a9a9a; }
+#cronologia-mapa li.clave { border-left-color: #b3261e; background: #fbe9e7; }
+.punto-suceso { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 5px 0 2px; vertical-align: 0; background: #888; }
+.punto-suceso.inicio { background: #111; }
+.punto-suceso.municipios { background: #6b6b6b; }
+.punto-suceso.centros { background: #2f6fb3; }
+.punto-suceso.cascada { background: #d9772b; }
+.punto-suceso.otros { background: #9a9a9a; }
+.tipos-suceso { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+.tipos-suceso label { cursor: pointer; white-space: nowrap; }
+ul.cronologia li.clave .nombre { font-weight: 600; color: #8b1a14; }
+#rep-sucesos { position: relative; height: 12px; margin-top: 6px; }
+#rep-sucesos .tic { position: absolute; top: 3px; width: 3px; height: 7px; margin-left: -1px; background: #888; cursor: pointer; }
+#rep-sucesos .tic.municipios { background: #6b6b6b; }
+#rep-sucesos .tic.centros { background: #2f6fb3; }
+#rep-sucesos .tic.cascada { background: #d9772b; }
+#rep-sucesos .tic.otros { background: #b0b0b0; }
+#rep-sucesos .tic.clave { top: 0; height: 12px; width: 4px; background: #b3261e; }
+#reproductor #rep-sucesos + input[type=range] { margin-top: 0; }
+
+/* Carreteras y vías afectadas (decisión del 11-11-2026) */
+.linea-via { display: inline-block; width: 18px; height: 0 !important; border: none !important; border-top: 4px solid #d1121b !important;
+  background: none !important; vertical-align: middle; margin: 0 5px 0 2px; }
+#cronologia-mapa li.vias { border-left-color: #8b1a14; }
+.punto-suceso.vias { background: #8b1a14; }
+#rep-sucesos .tic.vias { background: #8b1a14; }
+
+/* Esquema de la cascada (decisión del 11-11-2026) */
+.esquema-cascada { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 10px; }
+.cadena { display: flex; flex-direction: column; align-items: stretch; font-size: 12px; transition: opacity .4s; }
+.cadena + .cadena { margin-top: 6px; }
+.cadena.pendiente { opacity: .4; }
+.eslabon { padding: 4px 8px; border: 1.5px solid #d9772b; border-radius: 5px; background: #fff4e5; line-height: 1.25; }
+.eslabon small { color: #6b4a2a; }
+.eslabon.fuego { background: #b3261e; border-color: #7a140f; color: #fff; }
+.eslabon.fuego small { color: #fde; }
+.eslabon.centros { background: #fff; }
+.flecha-esquema { align-self: center; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent;
+  border-top: 8px solid #d9772b; margin: 2px 0; }
+
+/* Isocronas (decisión del 11-11-2026) */
+.linea-via.isocrona { border-top: 2px dashed #7a1f0e !important; }
+
+/* Conducciones de hidrocarburos: línea amarilla (decisión del 11-11-2026) */
+.linea-via.conduccion { border-top: 3px solid #f5c400 !important; }
+/* Símbolos de los globos de aviso de carreteras, vías, poblaciones y Seveso (decisión del 12-11-2026) */
+.linea-via.tren-aviso { border-top: 3px dashed #d1121b !important; }
+.simbolo.poblacion-aviso { background: #5a5a5a; border-radius: 2px; }
+.simbolo.seveso-aviso { background: #fff; border: 3px solid #d9772b; width: 7px; height: 7px; }
