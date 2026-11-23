@@ -376,6 +376,23 @@ El incendio de Tres Cantos del 11 de agosto de 2025 se simula con el viento medi
 
 Además, el modelo se comparó con siete incendios de la Comunidad entre 2022 y 2025 (`procesamiento/incendio/casos.py`), con hasta 15 simulaciones por caso que mueven la ignición 200 m y giran el viento 15°. La comparación se hace a una hora fijada de antemano (la de contención o, si no se conoce, 8 horas) y frente a un modelo nulo: un círculo de la misma superficie centrado en la ignición. En los seis casos de evaluación (Tres Cantos, con el que se ajustaron los parámetros, va aparte), la coincidencia mediana es 0,37 frente a 0,22 del círculo; el modelo supera al círculo en cuatro de los seis y sobrestima la superficie (mediana de 1,4 veces la real), porque no tiene extinción. Detalle en el apartado 3.12 de la metodología.
 
+### 7.11 Rotura de presa
+
+La gestión de crisis tiene una segunda amenaza: la rotura de una presa. En el panel de la alerta, un selector «Incendio / Rotura de presa»; con la rotura, la presa se elige de una lista o pulsándola en el mapa (las 15 presas se pintan en azul con su nombre), y se indica la hora. `POST /api/presa` (cuerpo: `presa` y `hora`) devuelve una respuesta con la misma forma que la del incendio y `"tipo": "presa"`, para que el visor reutilice el reproductor, las cartelas, la cronología, el ES-Alert y el mensaje para redes; humo y efecto cascada van vacíos. `GET /api/presas` da la lista de presas. El mapa de llegada se guarda con los incendios y se pide igual.
+
+La capa de rotura de presas del catálogo (2_3) da el nivel 2, la zona que inunda la onda en los primeros 30 minutos tras la rotura, y el nivel 1, el resto de la llanura de inundación. No dice de qué presa es cada zona ni cuándo llega el agua más allá de esos 30 minutos. Cascada lo completa con un modelo propio, calibrado con el propio catálogo:
+
+- **Presas** (`procesamiento/presas.py`). La capa se lleva a una rejilla de 50 m de toda la Comunidad (nivel máximo de cada celda) con la altitud media del MDT de 25 m del IGN. Cada zona de nivel 2 de al menos 0,2 km² es una presa: **15 presas**. Se sitúa, de las 40 celdas más altas de su zona, en aquella desde la que el agua llega, bajando, a más parte de la zona (la más alta a secas puede ser una ladera). Su nombre es el de la presa del Nomenclátor Geográfico Básico del IGN más cercana (a menos de 1,5 km) o, si no hay, el del embalse más cercano (a menos de 4 km); si tampoco, el del municipio, numerado si se repite.
+- **Recorrido del agua** (`procesamiento/presa/modelo.py`). Desde la presa, por las celdas de 50 m de la zona inundable (niveles 1 y 2), aguas abajo: el agua no pasa a una celda más de 10 m por encima de la más baja por la que ya ha pasado. Así salva los artefactos del relieve de 50 m (puentes, taludes, cañones estrechos que la media eleva), pero no remonta los afluentes. La distancia de cada celda a la presa es la del camino más corto con esa restricción (Dijkstra con 8 vecinos; la restricción depende del camino, y cada celda guarda la altitud mínima del camino por el que se alcanzó antes).
+- **Onda frenada.** La velocidad cae con la distancia a la presa, v(s) = v₀·L / (L + s), con L la longitud de la zona de 30 minutos de la presa: la mayor distancia que recorre el agua, con la misma regla, por su zona de nivel 2. A la salida de esa zona, la onda va a la mitad de velocidad; al triple de distancia, a un cuarto. Integrando, t(s) = (s + s²/2L) / v₀.
+- **Calibración con el catálogo:** v₀ = 1,5·L / 30 min, de modo que la onda tarda exactamente 30 minutos en recorrer la zona de nivel 2 de cada presa. En Santillana, L = 10,3 km y la onda sale a 31 km/h.
+- **Velocidad mínima** de 2 km/h: desde donde la onda frenada iría más despacio, avanza a esa velocidad.
+- **Horizonte:** hasta que el agua deja de avanzar, con un máximo de 24 horas.
+
+**Limitaciones.** El ritmo al que se frena la onda no tiene dato que lo fije: es una hipótesis razonable, no una medida. No hay calados, caudales ni forma de la onda, solo cuándo llega el agua a cada punto de la zona del catálogo, y la zona es la del catálogo, sin recalcular. Las zonas inundables de varias presas están conectadas (la del Jarama y el Manzanares suma 441 km²); la regla de no remontar decide qué parte alcanza cada rotura. No hay rotura en cadena de presas aguas abajo.
+
+En el visor, el agua se pinta en azul, con el frente de la onda más claro; los textos hablan de agua («Agua a menos de 50 m de…», «El agua entra en…», «Superficie inundada») y el ES-Alert pide alejarse de los cauces y subir a zonas altas. En Santillana, con la rotura a las 15:00 del 15 de julio, el agua baja por el Manzanares y el Jarama: entra en el término de Madrid (El Pardo) a las 15:41, llega a la M-40 y la M-30 hacia las 17:20 y al distrito Centro a las 18:22, a Getafe a las 20:24, a Titulcia a las 03:29 y a Aranjuez a las 04:58. En 24 horas, 172 km² inundados, 22 municipios y 137 centros.
+
 ## 8. Prealerta a 7 días
 
 Método, umbrales y limitaciones en `docs/metodologia.md`, apartado 4.
@@ -568,7 +585,7 @@ Historial: un commit por bloque de trabajo.
 - Subtipos y filtrado de activos: acogida, colegios extranjeros, cuatro centros educativos dudosos, zonas de casas de niños, hogares y clubes.
 - Parámetros del humo.
 - Informes del diseño funcional.
-- Segunda amenaza de crisis (nube tóxica o rotura de presa).
+- Tercera amenaza de crisis (nube tóxica) y rotura de presas en cadena.
 - Proyección del recorrido de los trenes que entran en la zona afectada.
 
 **Previsto y no construido todavía:** marca de plan de autoprotección (RDPA) que sube un grado la vulnerabilidad; estaciones del CRTM con los viajeros por franja de Renfe; alerta automática por incidencias de la DGT de incendio o humo; núcleos oficiales de la Comunidad en lugar de los extraídos de las teselas.

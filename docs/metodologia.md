@@ -323,6 +323,21 @@ Puntos de ignición: en Colmenar Viejo 2024, la glorieta de Casas Viejas; en El 
 
 **Reproducir.** `python -m procesamiento.incendio.casos`, que escribe `datos/procesados/validacion/conjunto.json` con cada simulación y el resumen de ajuste y evaluación. Son 75 simulaciones y tardan unos 13 minutos.
 
+### 3.13 Rotura de presa
+
+Segunda amenaza de la gestión de crisis. Comparte con el incendio el reproductor, los avisos, la cronología y las comunicaciones; un centro, un núcleo, una carretera o una vía se consideran alcanzados cuando el agua llega a menos de 50 m (una celda).
+
+La capa de rotura de presas del catálogo (2_3) da el nivel 2, la zona que inunda la onda en los primeros 30 minutos tras la rotura, y el nivel 1, el resto de la llanura de inundación. No dice de qué presa es cada zona ni cuándo llega el agua más allá de esos 30 minutos. Cascada lo completa con un modelo propio, calibrado con el propio catálogo:
+
+- **Presas** (`procesamiento/presas.py`). La capa se lleva a una rejilla de 50 m de toda la Comunidad (nivel máximo de cada celda) con la altitud media del MDT de 25 m del IGN. Cada zona de nivel 2 de al menos 0,2 km² es una presa: **15 presas**. Se sitúa, de las 40 celdas más altas de su zona, en aquella desde la que el agua llega, bajando, a más parte de la zona (la más alta a secas puede ser una ladera). Su nombre es el de la presa del Nomenclátor Geográfico Básico del IGN más cercana (a menos de 1,5 km) o, si no hay, el del embalse más cercano (a menos de 4 km); si tampoco, el del municipio, numerado si se repite.
+- **Recorrido del agua** (`procesamiento/presa/modelo.py`). Desde la presa, por las celdas de 50 m de la zona inundable (niveles 1 y 2), aguas abajo: el agua no pasa a una celda más de 10 m por encima de la más baja por la que ya ha pasado. Así salva los artefactos del relieve de 50 m (puentes, taludes, cañones estrechos que la media eleva), pero no remonta los afluentes. La distancia de cada celda a la presa es la del camino más corto con esa restricción (Dijkstra con 8 vecinos; la restricción depende del camino, y cada celda guarda la altitud mínima del camino por el que se alcanzó antes).
+- **Onda frenada.** La velocidad cae con la distancia a la presa, v(s) = v₀·L / (L + s), con L la longitud de la zona de 30 minutos de la presa: la mayor distancia que recorre el agua, con la misma regla, por su zona de nivel 2. A la salida de esa zona, la onda va a la mitad de velocidad; al triple de distancia, a un cuarto. Integrando, t(s) = (s + s²/2L) / v₀.
+- **Calibración con el catálogo:** v₀ = 1,5·L / 30 min, de modo que la onda tarda exactamente 30 minutos en recorrer la zona de nivel 2 de cada presa. En Santillana, L = 10,3 km y la onda sale a 31 km/h.
+- **Velocidad mínima** de 2 km/h: desde donde la onda frenada iría más despacio, avanza a esa velocidad.
+- **Horizonte:** hasta que el agua deja de avanzar, con un máximo de 24 horas.
+
+**Limitaciones.** El ritmo al que se frena la onda no tiene dato que lo fije: es una hipótesis razonable, no una medida. No hay calados, caudales ni forma de la onda, solo cuándo llega el agua a cada punto de la zona del catálogo, y la zona es la del catálogo, sin recalcular. Las zonas inundables de varias presas están conectadas (la del Jarama y el Manzanares suma 441 km²); la regla de no remontar decide qué parte alcanza cada rotura. No hay rotura en cadena de presas aguas abajo.
+
 ## 4. Prealerta a 7 días
 
 La prealerta responde a dónde está el riesgo focal en los próximos siete días: qué fenómenos meteorológicos adversos prevé AEMET para cada municipio, a qué activos afectan directamente y qué peligros del catálogo activan.

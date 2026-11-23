@@ -19,6 +19,8 @@ Es un demostrador: se ejecuta en local, sin usuarios ni credenciales, y todo lo 
 
 **Gestión de crisis por incendio.** Una alerta en un punto (clic en el mapa o foco de calor detectado por satélite) arranca una simulación de 24 horas: velocidad de propagación de Rothermel con el mapa de modelos de combustibles de la Comunidad de Madrid (EFFIS fuera de ella), el relieve del IGN y el viento de AEMET o introducido a mano, y ruta del fuego por tiempo mínimo de recorrido en celdas de 50 m, en una zona de cálculo de 50 × 50 km. El resultado se reproduce en el mapa minuto a minuto: área quemada, frente activo, humo viento abajo, centros alcanzados, instalaciones Seveso y conducciones que despliegan su propia amenaza al ser alcanzadas, carreteras, trenes de Cercanías, poblaciones y municipios afectados, y los habitantes de las celdas de 1 km que toca el fuego. A partir del instante mostrado se generan dos comunicaciones ficticias: un mensaje para redes sociales y un aviso ES-Alert, tal como saldrían (no se publica ni se envía nada). Todo puede verse en 3D, con el mapa inclinado sobre el relieve del IGN.
 
+**Gestión de crisis por rotura de presa.** Se elige una de las 15 presas deducidas de la capa de rotura de presas del catálogo y la hora: el agua baja por la zona inundable del catálogo, sin remontar los afluentes, con una onda que se frena, calibrada para recorrer en 30 minutos la zona de primera inundación que da el propio catálogo. El visor reproduce la llegada del agua con las mismas cartelas, cronología y comunicaciones que el incendio.
+
 Los métodos, supuestos y limitaciones están en [docs/metodologia.md](docs/metodologia.md), y la descripción técnica completa del demostrador, en [docs/memoria_demostrador.md](docs/memoria_demostrador.md).
 
 ## Requisitos
@@ -68,6 +70,8 @@ y abrir <http://localhost:8765>. Es un único servidor en Python que sirve el vi
 | `GET /api/celda?lon=&lat=` | Análisis basal de la celda de 1 km que contiene el punto |
 | `GET /api/activo?id=` | Ficha común y riesgos de un centro |
 | `GET /api/focos` | Focos de calor de NASA FIRMS en la Comunidad (últimas 24 h) |
+| `GET /api/presas` | Presas deducidas de la capa de rotura de presas del catálogo: identificador, nombre, municipio, posición |
+| `POST /api/presa` | Simula la rotura de una presa. Cuerpo JSON: `presa` (identificador) y `hora` (opcional, ISO local). Respuesta con la misma forma que la del incendio y `"tipo": "presa"` |
 | `POST /api/incendio` | Simula un incendio. Cuerpo JSON: `lon`, `lat`, `hora` (opcional, ISO local), `viento` (opcional: `velocidad_kmh`, `desde`) o `vientos` (opcional: lista hora a hora, hasta 25); sin viento se usa AEMET |
 | `GET /api/incendio/llegada?id=` | Mapa de tiempos de llegada de una simulación (enteros de 16 bits, minutos) |
 | `GET /api/validacion` | Caso de validación del modelo de incendio (Tres Cantos, 2025): simulación guardada, perímetro de EFFIS, focos de satélite y métricas |

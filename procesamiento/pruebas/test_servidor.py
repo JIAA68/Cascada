@@ -175,3 +175,17 @@ def test_api_activo(base):
     assert d["riesgos"][0]["nombre"] == "Transporte por tren" and d["riesgos"][0]["riesgo"] == 4
     assert pedir(base + "/api/activo?id=SOC-9")[0] == 404          # sensible: no se sirve
     assert pedir(base + "/api/activo?id=NO")[0] == 404
+
+
+def test_api_presas_y_presa_desconocida(base, monkeypatch):
+    import pandas as pd
+    from procesamiento.presa import simulacion as presa
+    tabla = pd.DataFrame([{"id": "PRE-01", "nombre": "Presa de prueba", "municipio": "Madrid", "lon": -3.8, "lat": 40.7,
+                           "longitud_30_min_m": 5000}])
+    monkeypatch.setattr(presa, "cargar_presas", lambda: tabla)
+    estado, _, cuerpo = pedir(base + "/api/presas")
+    assert estado == 200 and json.loads(cuerpo)[0]["nombre"] == "Presa de prueba"
+    estado, d = enviar(base + "/api/presa", json.dumps({"presa": "PRE-99", "hora": "2026-07-15T15:00"}).encode())
+    assert estado == 400 and "PRE-99" in d["error"]
+    estado, d = enviar(base + "/api/presa", json.dumps({"hora": "2026-07-15T15:00"}).encode())
+    assert estado == 400

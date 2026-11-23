@@ -14,7 +14,7 @@ Uso: python -m procesamiento.cadena [--sin-teselas] [--zoom-max 15]
 import argparse
 import time
 
-from . import basal, cercanias, combinadas, conducciones, nucleos, poblaciones, red_transporte, relieve, teselas
+from . import basal, cercanias, combinadas, conducciones, nucleos, poblaciones, presas, red_transporte, relieve, teselas
 from .capas import CAPAS, CAPAS_ACTIVACION_EXTRA, CAPAS_METEO, COMBINADAS, ZOOM_MAX_METEO, tif
 from .fuentes import fuente
 from .incendio import combustible_cm, validacion
@@ -55,6 +55,7 @@ def main(argv=None):
     print("5. Núcleos urbanos del mapa base para escalas pequeñas")
     nucleos.construir()
     print(f"  núcleos de población del nomenclátor del IGN (avisos de la crisis): {poblaciones.construir().name}")
+    print(f"  presas deducidas de la capa de rotura de presas del catálogo (crisis por rotura de presa): {presas.construir().name}")
 
     print("6. Prealerta: municipios, zonas de aviso de AEMET y capas meteorológicas de cada activo")
     territorio.construir()

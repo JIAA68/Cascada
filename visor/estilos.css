@@ -299,3 +299,6 @@ ul.cronologia li.clave .nombre { font-weight: 600; color: #8b1a14; }
 .linea-via.tren-aviso { border-top: 3px dashed #d1121b !important; }
 .simbolo.poblacion-aviso { background: #5a5a5a; border-radius: 2px; }
 .simbolo.seveso-aviso { background: #fff; border: 3px solid #d9772b; width: 7px; height: 7px; }
+
+/* Selector de amenaza de la crisis: incendio o rotura de presa */
+.tipo-crisis, .tipo-crisis:first-of-type { margin: 0 0 10px; }

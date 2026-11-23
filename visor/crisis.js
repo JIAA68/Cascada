@@ -7,6 +7,15 @@
 const NUNCA = 65535;
 const FRENTE_MIN = 20;                                   // el frente activo: quemado en los últimos 20 min
 const QUEMADO = [110, 18, 8, 150], FRENTE = [255, 96, 0, 240];
+// Palabras y colores de cada amenaza: el incendio y la rotura de presa comparten reproductor, cartelas, cronología y
+// comunicaciones
+const VOCES = {
+  incendio: { Agente: "Fuego", agente: "fuego", ElAgente: "El fuego", elAgente: "el fuego", superficie: "Superficie quemada",
+    celdas: "celdas con fuego", colores: [QUEMADO, FRENTE] },
+  presa: { Agente: "Agua", agente: "agua", ElAgente: "El agua", elAgente: "el agua", superficie: "Superficie inundada",
+    celdas: "celdas inundadas", colores: [[25, 80, 160, 165], [90, 185, 255, 235]] },
+};
+let voz = VOCES.incendio, tipoCrisis = "incendio", listaPresas = [], presaElegida = null;
 const RUMBOS = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
 const rumbo = (grados) => RUMBOS[Math.round(((grados % 360) + 360) % 360 / 45) % 8];
 const vacioFC = () => ({ type: "FeatureCollection", features: [] });
@@ -154,6 +163,18 @@ document.addEventListener("mapa-listo", () => {
   mapa.addLayer({ id: "validacion-focos", type: "circle", source: "validacion-focos", filter: ["<=", ["get", "minutos"], -1],
     paint: { "circle-radius": 6, "circle-color": "#ffd400", "circle-stroke-color": "#111", "circle-stroke-width": 1.5 } });
   capasClicables.push("focos");
+  // Presas deducidas del catálogo (procesamiento/presas.py), para elegir la que se rompe; solo en la alerta de presa
+  mapa.addSource("presas", { type: "geojson", data: vacioFC() });
+  mapa.addLayer({ id: "presas", type: "circle", source: "presas", layout: { visibility: "none" },
+    paint: { "circle-radius": 7, "circle-color": "#1d5fae", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+  mapa.addLayer({ id: "presas-nombre", type: "symbol", source: "presas",
+    layout: { visibility: "none", "text-field": ["get", "nombre"], "text-font": ["Open Sans Semibold"], "text-size": 12,
+      "text-offset": [0, 1.1], "text-anchor": "top" },
+    paint: { "text-color": "#123c6e", "text-halo-color": "#fff", "text-halo-width": 1.5 } });
+  capasClicables.push("presas");
+  mapa.on("click", "presas", (ev) => { if (modo === "crisis" && tipoCrisis === "presa") elegirPresa(ev.features[0].properties.id); });
+  mapa.on("mouseenter", "presas", () => mapa.getCanvas().style.cursor = "pointer");
+  mapa.on("mouseleave", "presas", () => mapa.getCanvas().style.cursor = "");
   mapa.on("click", "focos", (ev) => { if (modo === "crisis") registrarAlerta(ev.lngLat, "FIRMS"); });
   mapa.on("click", "afectados", (ev) => { if (modo === "crisis") mapa.easeTo({ center: ev.lngLat, zoom: Math.max(mapa.getZoom(), 14) }); });
   mapa.on("moveend", () => { if (sim) colocarCartelas(minutoPintado); });
@@ -161,6 +182,7 @@ document.addEventListener("mapa-listo", () => {
   mapa.on("mouseleave", "focos", () => mapa.getCanvas().style.cursor = "");
   mapa.on("click", (ev) => {
     if (modo !== "crisis" || sobreElemento(ev.point)) return;
+    if (tipoCrisis === "presa") return presaCercana(ev.lngLat);
     registrarAlerta(ev.lngLat, "manual");
   });
 });
@@ -175,6 +197,7 @@ document.addEventListener("modo", (ev) => {
   $("#cronologia-mapa").hidden = !crisis || !sim;
   $("#esalert-mapa").hidden = !crisis || !sim;
   if (mapa.getLayer("fuego")) visible("fuego", crisis);
+  for (const id of ["presas", "presas-nombre"]) if (mapa.getLayer(id)) visible(id, crisis && tipoCrisis === "presa" && !sim);
   if (marcador) crisis ? marcador.addTo(mapa) : marcador.remove();
   $("#reproductor").hidden = !crisis || !sim;
   if (!crisis) reproducir(false);
@@ -190,11 +213,77 @@ function registrarAlerta(lngLat, origen) {
   requestAnimationFrame(() => $("#alerta-datos").scrollIntoView({ block: "nearest", behavior: "smooth" }));
   $("#alerta-punto").innerHTML = `<strong>${origen === "FIRMS" ? "Alerta automática (foco de satélite)" : "Alerta manual"}</strong>` +
     `<br><span class="meta">${alerta.lat.toFixed(4)}, ${alerta.lon.toFixed(4)} · haz clic en otro punto para moverla</span>`;
-  if (!$("#alerta-hora").value) {
-    const ahora = new Date(); ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
-    $("#alerta-hora").value = ahora.toISOString().slice(0, 16);
-  }
+  horaPorDefecto();
   $("#estado").textContent = ""; $("#estado").className = "";
+}
+
+function horaPorDefecto() {
+  if ($("#alerta-hora").value) return;
+  const ahora = new Date(); ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+  $("#alerta-hora").value = ahora.toISOString().slice(0, 16);
+}
+
+// ----------------------------------------------------------------------------- amenaza: incendio o rotura de presa
+async function cambiarTipoCrisis(tipo) {
+  tipoCrisis = tipo;
+  const presa = tipo === "presa";
+  $("#crisis-incendio").classList.toggle("activo", !presa);
+  $("#crisis-presa").classList.toggle("activo", presa);
+  $("#alerta-titulo").textContent = presa ? "Alerta de rotura de presa" : "Alerta de incendio";
+  $("#alerta-ayuda").textContent = presa ? "Elige una presa de la lista o púlsala en el mapa."
+    : "Haz clic en el mapa para situar la alerta, o elige un foco de calor detectado por satélite.";
+  $("#focos-boton").hidden = presa; $("#focos-lista").hidden = presa;
+  $("#presa-eleccion").hidden = !presa;
+  $("#alerta-viento").hidden = presa;
+  $("#alerta-hora-texto").textContent = presa ? "Hora de la rotura" : "Hora de la ignición";
+  $("#simular").textContent = presa ? "Simular la rotura" : "Simular la evolución (24 h)";
+  alerta = null; presaElegida = null; $("#presa-lista").value = "";
+  if (marcador) { marcador.remove(); marcador = null; }
+  $("#alerta-datos").hidden = true; $("#alerta-ayuda").hidden = false;
+  $("#estado").textContent = ""; $("#estado").className = "";
+  for (const id of ["presas", "presas-nombre"]) visible(id, presa && modo === "crisis");
+  if (presa && !listaPresas.length) {
+    try {
+      listaPresas = await consultar("/api/presas");
+    } catch (e) {
+      $("#estado").className = "error"; $("#estado").textContent = `No se han podido cargar las presas: ${e.message}`;
+      $("#alerta-datos").hidden = false;
+      return;
+    }
+    mapa.getSource("presas").setData({ type: "FeatureCollection", features: listaPresas.map((p) => ({ type: "Feature",
+      geometry: { type: "Point", coordinates: [p.lon, p.lat] }, properties: { id: p.id, nombre: p.nombre } })) });
+    $("#presa-lista").innerHTML = `<option value="">Elige una presa…</option>` +
+      listaPresas.map((p) => `<option value="${p.id}">${html(p.nombre)} (${html(p.municipio)})</option>`).join("");
+  }
+}
+$("#crisis-incendio").onclick = () => cambiarTipoCrisis("incendio");
+$("#crisis-presa").onclick = () => cambiarTipoCrisis("presa");
+$("#presa-lista").onchange = () => { if ($("#presa-lista").value) elegirPresa($("#presa-lista").value, true); };
+
+function elegirPresa(id, volar = false) {
+  const p = listaPresas.find((x) => x.id === id);
+  if (!p) return;
+  presaElegida = p;
+  $("#presa-lista").value = id;
+  if (marcador) marcador.remove();
+  marcador = new maplibregl.Marker({ color: "#1d5fae" }).setLngLat([p.lon, p.lat]).addTo(mapa);
+  if (volar) mapa.flyTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 11) });
+  $("#alerta-ayuda").hidden = true;
+  $("#alerta-datos").hidden = false;
+  $("#alerta-punto").innerHTML = `<strong>${html(p.nombre)}</strong><br><span class="meta">${html(p.municipio)} · ` +
+    `presa deducida de la capa de rotura de presas del Catálogo de Riesgos Potenciales</span>`;
+  horaPorDefecto();
+  $("#estado").textContent = ""; $("#estado").className = "";
+}
+
+// La presa más cercana al clic, si está a menos de 3 km
+function presaCercana(lngLat) {
+  let mejor = null, dmin = Infinity;
+  for (const p of listaPresas) {
+    const d = Math.hypot((p.lon - lngLat.lng) * Math.cos((lngLat.lat * Math.PI) / 180), p.lat - lngLat.lat) * 111.32;
+    if (d < dmin) { dmin = d; mejor = p; }
+  }
+  if (mejor && dmin <= 3) elegirPresa(mejor.id);
 }
 
 $("#ver-focos").onclick = async () => {
@@ -224,18 +313,23 @@ $("#ver-focos").onclick = async () => {
 for (const r of document.querySelectorAll("input[name=viento]")) r.onchange = () => { $("#viento-manual").hidden = $("input[name=viento]:checked").value !== "manual"; };
 
 $("#simular").onclick = async () => {
-  if (!alerta) return;
+  const presa = tipoCrisis === "presa";
+  if (presa ? !presaElegida : !alerta) return;
   limpiarValidacion();
-  const cuerpo = { lon: alerta.lon, lat: alerta.lat, hora: $("#alerta-hora").value || undefined };
-  if ($("input[name=viento]:checked").value === "manual") cuerpo.viento = { velocidad_kmh: +$("#viento-vel").value, desde: +$("#viento-desde").value };
+  const hora = $("#alerta-hora").value || undefined;
+  const cuerpo = presa ? { presa: presaElegida.id, hora } : { lon: alerta.lon, lat: alerta.lat, hora };
+  if (!presa && $("input[name=viento]:checked").value === "manual") cuerpo.viento = { velocidad_kmh: +$("#viento-vel").value, desde: +$("#viento-desde").value };
   $("#simular").disabled = true;
-  $("#estado").className = ""; $("#estado").textContent = "Calculando la evolución del incendio (relieve, combustible, viento y propagación)…";
+  $("#estado").className = "";
+  $("#estado").textContent = presa ? "Calculando la llegada del agua aguas abajo de la presa…"
+    : "Calculando la evolución del incendio (relieve, combustible, viento y propagación)…";
   try {
-    const r = await fetch("/api/incendio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
+    const r = await fetch(presa ? "/api/presa" : "/api/incendio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || r.statusText);
     const mapaLlegada = await fetch(d.llegada_url).then((x) => x.arrayBuffer());
     cargarSimulacion(d, new Uint16Array(mapaLlegada));
+    for (const id of ["presas", "presas-nombre"]) visible(id, false);   // con la simulación, solo la presa rota
     $("#estado").textContent = "";
   } catch (e) {
     $("#estado").className = "error"; $("#estado").textContent = `No se ha podido simular: ${e.message}`;
@@ -280,6 +374,7 @@ function pintarHumo(minuto) {
 // ----------------------------------------------------------------------------- carga de una simulación
 function cargarSimulacion(d, mapaLlegada, historico = false) {
   sim = d; llegada = mapaLlegada; humoPintado = null;
+  voz = d.tipo === "presa" ? VOCES.presa : VOCES.incendio;
   const { filas, columnas, esquinas } = d.ventana;
   lienzo = document.createElement("canvas"); lienzo.width = columnas; lienzo.height = filas;
   dibujo = lienzo.getContext("2d"); pixeles = dibujo.createImageData(columnas, filas);
@@ -334,7 +429,7 @@ function cargarSimulacion(d, mapaLlegada, historico = false) {
     .filter((e, i, l) => l.indexOf(e) === i).sort((a, b) => a - b);
   minutoPintado = -1;
   fijarTiempo(0);
-  if (!historico) cruzarMovilidad(d);   // trenes y tráfico actuales en la zona afectada (movilidad.js); no en casos pasados
+  if (!historico && d.tipo !== "presa") cruzarMovilidad(d);   // trenes y tráfico actuales en la zona afectada (movilidad.js); no en casos pasados
 }
 
 // Todo lo que el fuego, las zonas Seveso o el humo alcanzan, como puntos con su minuto, su efecto y su nombre
@@ -353,7 +448,7 @@ function cosasAfectadas(d) {
     subtipo: a.subtipo, nombre: rotulo(a), orden: 10 * ORDEN_EFECTO[tipo] + ORDEN_VULNERABILIDAD[a.vulnerabilidad] })); };
   centros(d.activos_llamas, "llamas"); centros(d.cascada.activos, "derivada"); centros(d.humo.activos, "humo");
   for (const m of d.municipios) if (m.minutos > 0)
-    lista.push(afectado(m.lon, m.lat, { clase: "municipio", tipo: "llamas", minutos: m.minutos, nombre: `El fuego entra en ${m.nombre}`, orden: -1 }));
+    lista.push(afectado(m.lon, m.lat, { clase: "municipio", tipo: "llamas", minutos: m.minutos, nombre: `${voz.ElAgente} entra en ${m.nombre}`, orden: -1 }));
   // Carreteras y vías de tren: con el humo, en su primer punto bajo el humo; con el fuego, en el punto por el que llega
   for (const r of (d.vias || {}).resumen || []) {
     const nombre = unir(...tipoVia(r));
@@ -399,19 +494,19 @@ function listaAvisos(d) {
     lista.push({ id: a.id, tipo: a.tipo || f.subtipos[a.subtipo][0], nombre: a.tipo && a.tipo !== a.nombre ? a.nombre : a.municipio,
       color: f.color, minutos: a.minutos, lon: a.lon, lat: a.lat, ruta: a.ruta && a.ruta.length > 1 ? a.ruta : null,
       simbolo: `<span class="simbolo ${f.subtipos[a.subtipo][1]}" style="background:${f.color};color:${f.color}"></span>`,
-      alcanzado: (h) => `Fuego a menos de ${dist} m desde las ${h}` });
+      alcanzado: (h) => `${voz.Agente} a menos de ${dist} m desde las ${h}` });
   }
   for (const r of (d.vias || {}).resumen || []) if (r.llamas != null) {
     const [tipo, nombre] = tipoVia(r);
     lista.push({ id: `via-${r.via}`, tipo, nombre, color: COLOR_CARTELA.via, minutos: r.llamas, lon: r.lon_llamas ?? r.lon, lat: r.lat_llamas ?? r.lat,
       simbolo: r.tipo === "carretera" ? SIMBOLO_AVISO.via : SIMBOLO_AVISO.tren,
-      alcanzado: (h) => `Fuego a menos de ${dist} m desde las ${h}: probable corte` });
+      alcanzado: (h) => `${voz.Agente} a menos de ${dist} m desde las ${h}: probable corte` });
   }
   for (const p of d.poblaciones || [])
     // «Núcleo (IGN)» y no «Población»: el Nomenclátor llama núcleo de población también a
     // polígonos, bases, campings o instalaciones como «Iberdrola»
     lista.push({ id: `poblacion-${p.nombre}-${p.lon}`, tipo: "Núcleo (IGN)", nombre: p.nombre, color: COLOR_CARTELA.poblacion, minutos: p.minutos, lon: p.lon, lat: p.lat,
-      simbolo: SIMBOLO_AVISO.poblacion, alcanzado: (h) => `Fuego a menos de ${dist} m del casco desde las ${h}` });
+      simbolo: SIMBOLO_AVISO.poblacion, alcanzado: (h) => `${voz.Agente} a menos de ${dist} m del casco desde las ${h}` });
   for (const i of d.cascada.instalaciones_seveso)
     lista.push({ id: `seveso-${i.id}`, tipo: "Instalación Seveso", nombre: `${i.id} · ${zonasSeveso(i).map((z) => `${AMENAZA_CORTA[z.amenaza] || z.amenaza} ${km(z.radio_alerta_m)}`).join(", ")}`, color: COLOR_CARTELA.cascada, minutos: i.minutos, lon: i.lon, lat: i.lat,
       fuera_de_cupo: true, simbolo: SIMBOLO_AVISO.seveso, alcanzado: (h) => `Alcanzada a las ${h}: se activan sus zonas` });
@@ -448,7 +543,7 @@ function pintar(minuto) {
       const i = fila * columnas + col, v = llegada[i], p = i * 4;
       if (v <= minuto) {
         quemadas++;
-        const color = v > minuto - FRENTE_MIN ? FRENTE : QUEMADO;
+        const color = v > minuto - FRENTE_MIN ? voz.colores[1] : voz.colores[0];
         datos[p] = color[0]; datos[p + 1] = color[1]; datos[p + 2] = color[2]; datos[p + 3] = color[3];
       } else datos[p + 3] = 0;
     }
@@ -508,7 +603,7 @@ function fijarTiempo(nuevo) {
   const hora = new Date(new Date(sim.ignicion.hora).getTime() + minuto * 60000);
   const p = personasHasta(minuto);
   $("#rep-reloj").textContent = `+${duracion(minuto)} · ${hora.toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" })} · ${km2.toLocaleString("es-ES", { maximumFractionDigits: 2 })} km²` +
-    ` · ${numero(p.poblacion)} hab. en celdas con fuego` + (p.plazas ? ` · ${numero(p.plazas)} plazas sociales` : "") +
+    ` · ${numero(p.poblacion)} hab. en ${voz.celdas}` + (p.plazas ? ` · ${numero(p.plazas)} plazas sociales` : "") +
     (sim.borde_min != null && minuto >= sim.borde_min ? " · fuera de la zona de cálculo" : "");
   for (const el of $("#resultado").querySelectorAll("[data-min]")) el.classList.toggle("pendiente", +el.dataset.min > minuto);
   // Instalaciones y conducciones alcanzadas al avanzar (no en saltos de más de hora y media): animación de activación
@@ -630,7 +725,7 @@ function seccionVias(d, horaDe) {
   const dist = d.distancia_alcanzado_m, primero = (r) => Math.min(...[r.llamas, r.humo].filter((m) => m != null));
   const vias = d.vias.resumen.map((r) => `<li data-min="${primero(r)}" data-lon="${r.lon}" data-lat="${r.lat}"><span class="hora">${horaDe(primero(r))}</span>` +
     `<span class="nombre"><span class="linea-via" style="border-color:${r.llamas != null ? "#d1121b" : "#5f5f5f"}"></span>${html(r.via)}<br><span class="meta">` +
-    [r.llamas != null ? `fuego a menos de ${dist} m a las ${horaDe(r.llamas)} (${r.km_llamas.toLocaleString("es-ES")} km en 24 h): probable corte` : "",
+    [r.llamas != null ? `${voz.agente} a menos de ${dist} m a las ${horaDe(r.llamas)} (${r.km_llamas.toLocaleString("es-ES")} km en 24 h): probable corte` : "",
       r.humo != null ? `humo a las ${horaDe(r.humo)}: visibilidad reducida` : ""].filter(Boolean).join(" · ") +
     `</span></span><span class="marca ${r.llamas != null ? "llamas" : "humo"}">+${duracion(primero(r))}</span></li>`).join("");
   const tp = d.trenes_programados, fecha = (s) => `${s.slice(6, 8)}-${s.slice(4, 6)}-${s.slice(0, 4)}`;
@@ -643,7 +738,7 @@ function seccionVias(d, horaDe) {
     : tp.trenes.length
       ? `<ul class="activos">${tp.trenes.map((t) => `<li data-min="${t.minutos}" data-lon="${t.lon}" data-lat="${t.lat}"><span class="hora">${horaDe(t.minutos)}</span>` +
           `<span class="nombre"><span class="simbolo circulo" style="background:#2b2b2b"></span><strong>${html(t.linea)}</strong> por ${html(t.estacion)}` +
-          `<br><span class="meta">${t.trenes} tren${t.trenes > 1 ? "es pasan" : " pasa"}, en los dos sentidos, con la estación bajo el humo o con el fuego a menos de ${dist} m; el primero, hacia ${html(t.hacia)}` +
+          `<br><span class="meta">${t.trenes} tren${t.trenes > 1 ? "es pasan" : " pasa"}, en los dos sentidos, con la estación bajo el humo o con ${voz.elAgente} a menos de ${dist} m; el primero, hacia ${html(t.hacia)}` +
           (t.trenes_llamas ? `; ${t.trenes_llamas} con el fuego, desde las ${horaDe(t.primero_llamas)}` : "") + `</span></span>` +
           `<span class="marca ${t.efecto}">+${duracion(t.minutos)}</span></li>`).join("")}</ul>`
       : `<p class="meta">${tp.estaciones.length ? `Estaciones afectadas (${tp.estaciones.map((e) => html(e.nombre)).join(", ")}), sin trenes programados mientras lo están.` : "El fuego y el humo no alcanzan estaciones de Cercanías."}</p>`;
@@ -675,21 +770,21 @@ function construirSucesos(d) {
   const dist = d.distancia_alcanzado_m, lista = [];
   const de = (a) => `<strong>${html(rotulo(a))}</strong> (${html(a.municipio)}, vulnerabilidad ${VULNERABILIDAD[a.vulnerabilidad]})`;
   const agrupar = (arr, clave) => arr.reduce((m, a) => m.set(clave(a), [...(m.get(clave(a)) || []), a]), new Map());
-  lista.push({ min: 0, tipo: "inicio", texto: `Ignición en <strong>${html(d.ignicion.municipio)}</strong>`, lon: d.ignicion.lon, lat: d.ignicion.lat });
+  lista.push({ min: 0, tipo: "inicio", texto: d.tipo === "presa" ? `Rotura de la <strong>${html(d.presa.nombre)}</strong> (${html(d.ignicion.municipio)})` : `Ignición en <strong>${html(d.ignicion.municipio)}</strong>`, lon: d.ignicion.lon, lat: d.ignicion.lat });
   for (const m of d.municipios) if (m.minutos > 0)
-    lista.push({ min: m.minutos, tipo: "municipios", texto: `El fuego entra en <strong>${html(m.nombre)}</strong>`, lon: m.lon, lat: m.lat });
+    lista.push({ min: m.minutos, tipo: "municipios", texto: `${voz.ElAgente} entra en <strong>${html(m.nombre)}</strong>`, lon: m.lon, lat: m.lat });
   for (const p of d.poblaciones || [])
-    lista.push({ min: p.minutos, tipo: "municipios", texto: `Fuego a menos de ${dist} m del <strong>núcleo ${html(p.nombre)}</strong> (IGN)`, lon: p.lon, lat: p.lat });
+    lista.push({ min: p.minutos, tipo: "municipios", texto: `${voz.Agente} a menos de ${dist} m del <strong>núcleo ${html(p.nombre)}</strong> (IGN)`, lon: p.lon, lat: p.lat });
   // Centros: uno a uno los de vulnerabilidad alta y muy alta; los demás, agrupados por hora
   const resto = [];
   for (const a of d.activos_llamas) {
     if (a.vulnerabilidad === "alta" || a.vulnerabilidad === "muy_alta")
-      lista.push({ min: a.minutos, tipo: "centros", clave: a.vulnerabilidad === "muy_alta", texto: `Fuego a menos de ${dist} m de ${de(a)}`, lon: a.lon, lat: a.lat });
+      lista.push({ min: a.minutos, tipo: "centros", clave: a.vulnerabilidad === "muy_alta", texto: `${voz.Agente} a menos de ${dist} m de ${de(a)}`, lon: a.lon, lat: a.lat });
     else resto.push(a);
   }
   for (const g of agrupar(resto, (a) => Math.floor(a.minutos / 60)).values())
     lista.push({ min: g[0].minutos, tipo: "centros", lon: g[0].lon, lat: g[0].lat, texto: g.length === 1
-      ? `Fuego a menos de ${dist} m de ${de(g[0])}` : `Fuego a menos de ${dist} m de <strong>${g.length} centros</strong> de vulnerabilidad moderada o baja` });
+      ? `${voz.Agente} a menos de ${dist} m de ${de(g[0])}` : `${voz.Agente} a menos de ${dist} m de <strong>${g.length} centros</strong> de vulnerabilidad moderada o baja` });
   // Efecto cascada
   for (const i of d.cascada.instalaciones_seveso)
     lista.push({ min: i.minutos, tipo: "cascada", clave: true, lon: i.lon, lat: i.lat,
@@ -707,7 +802,7 @@ function construirSucesos(d) {
   // Carreteras y vías: el fuego, uno a uno; el humo, agrupado por minuto
   if (d.vias) {
     for (const r of d.vias.resumen) if (r.llamas != null)
-      lista.push({ min: r.llamas, tipo: "vias", lon: r.lon, lat: r.lat, texto: `Fuego a menos de ${dist} m de ${nombreVia(r)}: probable corte` });
+      lista.push({ min: r.llamas, tipo: "vias", lon: r.lon, lat: r.lat, texto: `${voz.Agente} a menos de ${dist} m de ${nombreVia(r)}: probable corte` });
     for (const g of agrupar(d.vias.resumen.filter((r) => r.humo != null), (r) => r.humo).values()) {
       const nombres = g.map(nombreVia);
       lista.push({ min: g[0].humo, tipo: "vias", lon: g[0].lon, lat: g[0].lat, texto: `Humo sobre ${nombres.length > 4
@@ -716,9 +811,9 @@ function construirSucesos(d) {
   }
   for (const t of (d.trenes_programados || {}).trenes || []) {
     lista.push({ min: t.minutos, tipo: "vias", lon: t.lon, lat: t.lat, texto: `Primer <strong>${html(t.linea)}</strong> por ${html(t.estacion)} ` +
-      (t.efecto === "llamas" ? `con el fuego a menos de ${dist} m` : "bajo el humo") + `, hacia ${html(t.hacia)} (${t.trenes} tren${t.trenes > 1 ? "es" : ""} de la línea en 24 h)` });
+      (t.efecto === "llamas" ? `con ${voz.elAgente} a menos de ${dist} m` : "bajo el humo") + `, hacia ${html(t.hacia)} (${t.trenes} tren${t.trenes > 1 ? "es" : ""} de la línea en 24 h)` });
     if (t.efecto === "humo" && t.primero_llamas != null)
-      lista.push({ min: t.primero_llamas, tipo: "vias", lon: t.lon, lat: t.lat, texto: `Primer <strong>${html(t.linea)}</strong> por ${html(t.estacion)} con el fuego a menos de ${dist} m` });
+      lista.push({ min: t.primero_llamas, tipo: "vias", lon: t.lon, lat: t.lat, texto: `Primer <strong>${html(t.linea)}</strong> por ${html(t.estacion)} con ${voz.elAgente} a menos de ${dist} m` });
   }
   // Humo sobre centros, agrupado por minuto
   for (const g of agrupar(d.humo.activos, (a) => a.minutos).values())
@@ -729,7 +824,7 @@ function construirSucesos(d) {
 
 // Trenes, incidencias de la DGT y tráfico de la ciudad alcanzados (movilidad.js, cuando responde la consulta)
 function anadirSucesosMovilidad(d) {
-  const efecto = (e) => e.minutos_llamas === e.minutos ? `fuego a menos de ${d.distancia_alcanzado_m} m` : "bajo el humo";
+  const efecto = (e) => e.minutos_llamas === e.minutos ? `${voz.agente} a menos de ${d.distancia_alcanzado_m} m` : "bajo el humo";
   for (const e of d.trenes.afectados || [])
     sucesos.push({ min: e.minutos, tipo: "otros", lon: e.lon, lat: e.lat, texto: `Tren <strong>${html(e.linea)}</strong> en su posición actual: ${efecto(e)}` });
   for (const e of d.incidencias.afectados || [])
@@ -1152,7 +1247,7 @@ function mostrarResultado(d) {
   const hora0 = new Date(d.ignicion.hora);
   const horaDe = (min) => hhmm(new Date(hora0.getTime() + min * 60000));
   const v = d.viento;
-  const viento = v.origen === "AEMET"
+  const viento = d.tipo === "presa" ? "" : v.origen === "AEMET"
     ? `AEMET: observado en ${html(v.estacion.estacion)} (a ${v.estacion.distancia_km} km) y previsto para ${html(v.municipio)}` +
       (v.horas_repetidas ? ` (${v.horas_repetidas} h sin predicción, se mantiene la anterior)` : "") +
       (v.horas_con_racha ? `; racha en lugar del viento medio en ${v.horas_con_racha} h (tormenta prevista, o racha observada de ${v.umbral_racha_kmh} km/h o más)` : "")
@@ -1160,7 +1255,7 @@ function mostrarResultado(d) {
       ? `${html(v.fuente || "introducido a mano")}, hora a hora (${d.vientos_por_hora[0].velocidad_kmh.toLocaleString("es-ES")} km/h del ${rumbo(d.vientos_por_hora[0].desde)} en la primera hora` +
         (v.racha ? `: ${html(v.racha)}` : "") + ")"
       : `introducido a mano, constante: ${d.vientos_por_hora[0].velocidad_kmh} km/h del ${rumbo(d.vientos_por_hora[0].desde)}`;
-  const finos = (d.humedades_por_hora || [d.humedades]).map((h) => Math.round(h.m_1h * 1000) / 10);
+  const finos = d.tipo === "presa" ? [0] : (d.humedades_por_hora || [d.humedades]).map((h) => Math.round(h.m_1h * 1000) / 10);
   const humedad = d.humedad_fija === false
     ? `humedad del combustible muerto fino del ${Math.min(...finos).toLocaleString("es-ES")} al ${Math.max(...finos).toLocaleString("es-ES")} %, ` +
       `de ${html(v.humedad || "la temperatura y la humedad del aire, hora a hora")}`
@@ -1181,7 +1276,7 @@ function mostrarResultado(d) {
   $("#resultado").hidden = false;
   requestAnimationFrame(() => $("#resultado").scrollIntoView({ block: "start", behavior: "smooth" }));
   $("#resultado").innerHTML = `
-    <h2>Evolución estimada</h2>
+    ${d.tipo === "presa" ? cabeceraPresa(d, horaDe) : `<h2>Evolución estimada</h2>
     ${d.sin_propagacion ? `<p class="aviso">El fuego no avanza: ${html(d.sin_propagacion)}.</p>` : ""}
     ${d.borde_min != null ? `<p class="aviso">El fuego llega al borde de la zona de cálculo (${(d.ventana.columnas * d.ventana.celda_m / 1000).toLocaleString("es-ES")} km de lado) a las ${horaDe(d.borde_min)}: desde entonces, la superficie y los afectados se quedan cortos.</p>` : ""}
     <p class="meta">Ignición a las ${hhmm(hora0)} en ${html(d.ignicion.municipio)}, sobre ${html(d.ignicion.combustible_nombre).toLowerCase()} a ${numero(d.ignicion.altitud_m)} m.
@@ -1197,28 +1292,44 @@ function mostrarResultado(d) {
     <p class="meta">Cada cosa alcanzada aparece en el mapa al llegarle el efecto, con su nombre, que se queda hasta el final:
       <span style="color:${COLOR_EFECTO.llamas};font-weight:600">fuego a menos de ${d.distancia_alcanzado_m} m</span>,
       <span style="color:${COLOR_EFECTO.derivada};font-weight:600">zona Seveso o de la conducción</span>,
-      <span style="color:${COLOR_EFECTO.humo};font-weight:600">humo</span>.</p>
+      <span style="color:${COLOR_EFECTO.humo};font-weight:600">humo</span>.</p>`}
     <div id="cronologia"></div>
-    <h3>Superficie quemada</h3>
+    <h3>${voz.superficie}</h3>
     <p>${Object.entries(d.superficie_km2).map(([h, k]) => `<strong>${h} h</strong>: ${k.toLocaleString("es-ES")} km²`).join(" · ")}</p>
-    <h3>Habitantes en las celdas de 1 km que toca el fuego</h3>
-    <p class="meta">Población del Censo 2021 en las celdas de 1 km que toca el fuego (la celda entera, aunque arda solo una parte) y plazas de los centros sociales alcanzados.</p>
+    <h3>Habitantes en las celdas de 1 km que toca ${voz.elAgente}</h3>
+    <p class="meta">Población del Censo 2021 en las celdas de 1 km que toca ${voz.elAgente} (la celda entera, aunque ${d.tipo === "presa" ? "solo se inunde" : "arda solo"} una parte) y plazas de los centros sociales alcanzados.</p>
     <table class="personas"><tr><th></th><th>Habitantes</th><th>Menores de 16</th><th>Mayores de 64</th><th>Plazas sociales</th></tr>
     ${d.horizontes_h.map((h) => { const p = personasHasta(h * 60, d); return `<tr><td><strong>${h} h</strong></td><td>${numero(p.poblacion)}</td><td>${numero(p.menores_16)}</td><td>${numero(p.mayores_64)}</td><td>${numero(p.plazas)}</td></tr>`; }).join("")}</table>
-    <h3>Municipios en los que entra el fuego (${d.municipios.length})</h3>
+    <h3>Municipios en los que entra ${voz.elAgente} (${d.municipios.length})</h3>
     <ul class="activos">${d.municipios.map((m) => `<li data-min="${m.minutos}"><span class="hora">${horaDe(m.minutos)}</span><span class="nombre">${html(m.nombre)}</span><span class="meta">+${duracion(m.minutos)}</span></li>`).join("")}</ul>
-    <h3>Activos alcanzados por las llamas (${d.activos_llamas.length})</h3>
-    <p class="meta">Fuego a menos de ${d.distancia_alcanzado_m} m del centro.</p>
+    <h3>Activos alcanzados por ${d.tipo === "presa" ? "el agua" : "las llamas"} (${d.activos_llamas.length})</h3>
+    <p class="meta">${voz.Agente} a menos de ${d.distancia_alcanzado_m} m del centro.</p>
     ${lista(d.activos_llamas, "llamas")}${sens(d.sensibles_llamas)}
-    <h3>Efecto cascada</h3>
+    ${d.tipo === "presa" ? "" : `<h3>Efecto cascada</h3>
     ${esquemaCascada(d, horaDe)}
     ${seveso || cond ? `<ul>${seveso}${cond}</ul>` : `<p class="meta">El fuego no alcanza instalaciones Seveso ni conducciones de hidrocarburos en 24 h.</p>`}
     ${d.cascada.activos.length ? `<h4>Activos bajo amenaza derivada (${d.cascada.activos.length})</h4>${lista(d.cascada.activos, "derivada", (a) => `${html(a.origen)}, zona de ${html(a.zona)}${porAmenaza(a)}`)}` : ""}${sens(d.cascada.sensibles)}
     <h3>Activos bajo el humo (${d.humo.activos.length})</h3>
     <p class="meta">Cono viento abajo del área quemada, recalculado cada ${d.humo.parametros.paso_min} minutos (semiángulo ${d.humo.parametros.semiangulo_grados}°, hasta ${d.humo.parametros.alcance_max_km} km más allá del fuego).</p>
-    ${lista(d.humo.activos, "humo")}${sens(d.humo.sensibles)}
+    ${lista(d.humo.activos, "humo")}${sens(d.humo.sensibles)}`}
     ${seccionVias(d, horaDe)}`;
   for (const li of $("#resultado").querySelectorAll("li[data-lon]")) li.onclick = () => mapa.flyTo({ center: [+li.dataset.lon, +li.dataset.lat], zoom: 14 });
+}
+
+// Cabecera del resultado de una rotura de presa: el modelo de la onda y la leyenda
+function cabeceraPresa(d, horaDe) {
+  const p = d.presa, m = d.modelo, km = (x) => (x / 1000).toLocaleString("es-ES", { maximumFractionDigits: 1 });
+  return `<h2>Evolución estimada</h2>
+    <p class="meta">Rotura de la ${html(p.nombre)} (${html(d.ignicion.municipio)}) a las ${horaDe(0)}. El agua recorre, aguas abajo, la zona
+      inundable de la capa de rotura de presas del Catálogo de Riesgos Potenciales, con una onda que se frena: sale a
+      ${m.velocidad_inicial_kmh.toLocaleString("es-ES")} km/h, calibrada para recorrer en 30 minutos la zona de primera inundación del
+      catálogo (${km(p.longitud_30_min_m)} km), y no baja de ${m.velocidad_min_kmh} km/h. Relieve del IGN (25 m) sobre celdas de 50 m.
+      ${m.fin_min < d.horizonte_min ? `Deja de avanzar a las ${horaDe(m.fin_min)}.` : ""}</p>
+    <p class="leyenda-crisis"><span style="background:rgb(90,185,255)"></span>frente de la onda <span style="background:rgba(25,80,160,.65)"></span>zona inundada
+      <span class="linea-via" style="border-color:#d1121b"></span>carretera o vía con agua a menos de ${d.distancia_alcanzado_m} m
+      <span class="linea-via isocrona"></span>hasta dónde llega el agua en las próximas horas</p>
+    <p class="meta">Avisos: centros, carreteras, vías de tren y núcleos de población del IGN a los que llegará el agua en las próximas
+      3 horas, con la cuenta atrás; los ${AVISO.simultaneos} más próximos a la vez.</p>`;
 }
 
 // ----------------------------------------------------------------------------- comunicaciones ficticias
@@ -1232,14 +1343,19 @@ function comunicar(minuto, hora, km2) {
   const d = sim;
   const municipios = d.municipios.filter((m) => m.minutos <= minuto).map((m) => m.nombre);
   const alcanzados = d.activos_llamas.filter((a) => a.minutos <= minuto);
-  const w = d.vientos_por_hora[Math.min(Math.floor(minuto / 60), d.vientos_por_hora.length - 1)];
-  const haciaHumo = w.velocidad_kmh > 0 ? `hacia el ${rumbo(w.desde + 180)}` : "sin viento, sobre la zona";
+  const presa = d.tipo === "presa";
+  const w = presa ? null : d.vientos_por_hora[Math.min(Math.floor(minuto / 60), d.vientos_por_hora.length - 1)];
+  const haciaHumo = presa ? "" : w.velocidad_kmh > 0 ? `hacia el ${rumbo(w.desde + 180)}` : "sin viento, sobre la zona";
   const centros = alcanzados.length
     ? ` ${alcanzados.length} centro${alcanzados.length > 1 ? "s" : ""} con población vulnerable alcanzado${alcanzados.length > 1 ? "s" : ""}` +
       ` (${alcanzados.slice(0, 3).map(rotulo).join(", ")}${alcanzados.length > 3 ? "…" : ""}).`
     : "";
-  $("#rrss-texto").textContent =
-    `🔥 Incendio forestal en ${d.ignicion.municipio}, iniciado a las ${hhmm(new Date(d.ignicion.hora))}. ` +
+  $("#rrss-texto").textContent = presa
+    ? `🌊 Rotura de la ${d.presa.nombre} (${d.ignicion.municipio}) a las ${hhmm(new Date(d.ignicion.hora))}. ` +
+      `Situación estimada a las ${hhmm(hora)}: ${km2.toLocaleString("es-ES", { maximumFractionDigits: 1 })} km² inundados` +
+      `${municipios.length ? ` en ${municipios.join(", ")}` : ""}.${centros} ` +
+      `Aléjate de los cauces, sube a zonas altas y sigue las indicaciones de los servicios de emergencia. 📍 ${d.ignicion.lat.toFixed(4)}, ${d.ignicion.lon.toFixed(4)} #Cascada`
+    : `🔥 Incendio forestal en ${d.ignicion.municipio}, iniciado a las ${hhmm(new Date(d.ignicion.hora))}. ` +
     `Situación estimada a las ${hhmm(hora)}: ${km2.toLocaleString("es-ES", { maximumFractionDigits: 1 })} km² afectados` +
     `${municipios.length ? ` en ${municipios.join(", ")}` : ""}. Humo ${haciaHumo}.${centros} ` +
     `Evita la zona y sigue las indicaciones de los servicios de emergencia. 📍 ${d.ignicion.lat.toFixed(4)}, ${d.ignicion.lon.toFixed(4)} #Cascada`;
@@ -1247,7 +1363,11 @@ function comunicar(minuto, hora, km2) {
   const area = d.municipios.filter((m) => m.minutos <= emision + 60).map((m) => m.nombre);
   const horaEmision = new Date(new Date(d.ignicion.hora).getTime() + emision * 60000);
   const lista = area.join(", ") || d.ignicion.municipio;
-  const cuerpo = `Incendio forestal en ${d.ignicion.municipio}. Puede afectar en la próxima hora a: ${lista}.\n` +
+  const cuerpo = presa
+    ? `Rotura de presa: ${d.presa.nombre}. Puede inundar en la próxima hora: ${lista}.\n` +
+      `Si está cerca del cauce, diríjase de inmediato a zonas altas por las vías que indiquen los servicios de emergencia. ` +
+      `No cruce cauces ni zonas inundadas y no use el coche. Información: 112.`
+    : `Incendio forestal en ${d.ignicion.municipio}. Puede afectar en la próxima hora a: ${lista}.\n` +
     `Si está en esta zona, aléjese del fuego por las vías que indiquen los servicios de emergencia. ` +
     `Si hay humo, cierre puertas y ventanas y permanezca en el interior. No se acerque a la zona. Información: 112.`;
   $("#esalert-texto").textContent = `ALERTA DE PROTECCIÓN CIVIL\n${cuerpo}\n` +

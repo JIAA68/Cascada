@@ -213,7 +213,7 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/prealerta/actualizar":
             from .prealerta import servicio
             return self.json(servicio.actualizar())
-        if ruta != "/api/incendio":
+        if ruta not in ("/api/incendio", "/api/presa"):
             return self.error(HTTPStatus.NOT_FOUND, "No encontrado")
         try:
             longitud = int(self.headers.get("Content-Length", 0))
@@ -223,7 +223,7 @@ class Manejador(BaseHTTPRequestHandler):
             return self.error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Alerta incorrecta: cuerpo ausente o demasiado grande")
         try:
             cuerpo = json.loads(self.rfile.read(longitud) or b"{}")
-            self.json(simular_incendio(cuerpo))
+            self.json(simular_incendio(cuerpo) if ruta == "/api/incendio" else simular_presa(cuerpo))
         except (KeyError, ValueError, TypeError, AttributeError) as e:
             self.error(HTTPStatus.BAD_REQUEST, f"Alerta incorrecta: {e}")
         except OSError as e:   # AEMET, IGN o FIRMS no responden
@@ -254,6 +254,9 @@ class Manejador(BaseHTTPRequestHandler):
             elif ruta == "/api/incendio/movilidad":
                 from .incendio.movilidad import cruce
                 datos = cruce(parametros["id"][0])
+            elif ruta == "/api/presas":
+                from .presa.simulacion import presas
+                datos = presas()
             elif ruta == "/api/incendio/llegada":
                 from .incendio.simulacion import llegada_u16
                 return self.binario(llegada_u16(parametros["id"][0]))
@@ -332,6 +335,21 @@ def simular_incendio(peticion: dict) -> dict:
     if any(not 0 <= w.velocidad_kmh <= 150 for w in manual):
         raise ValueError("velocidad de viento fuera de rango")
     return simular(lon, lat, hora, (manual[0] if len(manual) == 1 else manual) or None)
+
+
+def simular_presa(peticion: dict) -> dict:
+    """Valida la alerta de rotura de presa recibida y lanza la simulación."""
+    from datetime import datetime
+    from .incendio.entradas import MADRID
+    from .presa.simulacion import simular
+    if not isinstance(peticion, dict):
+        raise ValueError("se esperaba un objeto JSON")
+    presa = str(peticion["presa"])
+    hora = datetime.fromisoformat(peticion["hora"]) if peticion.get("hora") else datetime.now(MADRID)
+    hora = hora.replace(tzinfo=MADRID) if hora.tzinfo is None else hora
+    if not 2000 <= hora.year <= 2100:
+        raise ValueError("fecha fuera de rango")
+    return simular(presa, hora)
 
 
 class Servidor(ThreadingHTTPServer):

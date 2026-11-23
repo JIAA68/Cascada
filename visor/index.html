@@ -132,14 +132,22 @@
 
       <div id="panel-crisis" hidden>
         <section id="alerta">
-          <h2>Alerta de incendio</h2>
+          <!-- Amenaza de la crisis: incendio forestal o rotura de presa -->
+          <div class="botones tipo-crisis" role="group" aria-label="Amenaza">
+            <button id="crisis-incendio" class="activo" type="button">Incendio</button>
+            <button id="crisis-presa" type="button">Rotura de presa</button>
+          </div>
+          <h2 id="alerta-titulo">Alerta de incendio</h2>
           <p id="alerta-ayuda">Haz clic en el mapa para situar la alerta, o elige un foco de calor detectado por satélite.</p>
-          <p><button id="ver-focos" type="button">Focos de satélite (NASA FIRMS, 24 h)</button></p>
+          <p id="focos-boton"><button id="ver-focos" type="button">Focos de satélite (NASA FIRMS, 24 h)</button></p>
           <div id="focos-lista"></div>
+          <div id="presa-eleccion" hidden>
+            <label>Presa <select id="presa-lista"><option value="">Elige una presa…</option></select></label>
+          </div>
           <div id="alerta-datos" hidden>
             <p id="alerta-punto"></p>
-            <label>Hora de la ignición <input id="alerta-hora" type="datetime-local"></label>
-            <fieldset>
+            <label><span id="alerta-hora-texto">Hora de la ignición</span> <input id="alerta-hora" type="datetime-local"></label>
+            <fieldset id="alerta-viento">
               <legend>Viento</legend>
               <label><input type="radio" name="viento" value="aemet" checked> AEMET (observado y previsto)</label>
               <label><input type="radio" name="viento" value="manual"> Introducido a mano</label>
