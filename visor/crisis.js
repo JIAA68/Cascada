@@ -910,7 +910,11 @@ function espacioVacio(minuto, ancho, alto) {
   const celdas = new Uint8Array(gw * gh);
   // El fuego, con la media hora siguiente (para que no se le eche encima enseguida); el humo, el que se ve: el cono crece
   // tan deprisa con el viento que el de media hora después ocuparía casi todo el espacio vacío
-  const hayFuego = fuegoEnPantalla(minuto + CARTELA.antelacion_min), hayHumo = humoEnPantalla(minuto);
+  // En la vista plana, la pantalla es una transformación afín de la ventana de cálculo y cada celda de la rejilla se
+  // consulta directamente; en 3D (mapa inclinado o sobre el relieve) no, y el fuego se marca más abajo proyectando
+  // sus celdas
+  const plano = !mapa.getTerrain() && mapa.getPitch() < 1;
+  const hayFuego = plano ? fuegoEnPantalla(minuto + CARTELA.antelacion_min) : () => false, hayHumo = humoEnPantalla(minuto);
   // Polígonos y círculos, como funciones de punto con su recuadro para descartar rápido
   const poligonos = [];
   const anillo = (coords) => {
@@ -934,6 +938,20 @@ function espacioVacio(minuto, ancho, alto) {
     const x = i * P + P / 2, y = j * P + P / 2;
     if (hayFuego(x, y) || hayHumo(x, y) || poligonos.some((p) => x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1 && p.dentro(x, y)))
       celdas[j * gw + i] = 1;
+  }
+  // Fuego en 3D: se proyecta una celda de cálculo cada ~9 px de pantalla (medidos en el centro de la ventana) y se
+  // marcan las celdas de la rejilla de alrededor, con margen para la perspectiva, que estira lo cercano
+  if (!plano) {
+    const { filas, columnas } = sim.ventana, hasta = minuto + CARTELA.antelacion_min;
+    const a = mapa.project(lonlat(columnas / 2, filas / 2)), b = mapa.project(lonlat(columnas / 2 + 10, filas / 2));
+    const pxCelda = Math.max(Math.hypot(b.x - a.x, b.y - a.y) / 10, 0.05);
+    const s = Math.max(1, Math.floor(P / pxCelda)), r = 2;
+    for (let f = 0; f < filas; f += s) for (let col = 0; col < columnas; col += s) {
+      if (!(llegada[f * columnas + col] <= hasta)) continue;
+      const q = mapa.project(lonlat(col + 0.5, f + 0.5)), qi = Math.floor(q.x / P), qj = Math.floor(q.y / P);
+      for (let j = qj - r; j <= qj + r; j++) for (let i = qi - r; i <= qi + r; i++)
+        if (i >= 0 && j >= 0 && i < gw && j < gh) celdas[j * gw + i] = 1;
+    }
   }
   // Símbolos de lo ya alcanzado (centros, estaciones, trenes, entradas en municipios…): unos 10 px alrededor
   for (const f of afectadosBase) if (f.properties.minutos <= minuto) {

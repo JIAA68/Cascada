@@ -14,7 +14,7 @@ Uso: python -m procesamiento.cadena [--sin-teselas] [--zoom-max 15]
 import argparse
 import time
 
-from . import basal, cercanias, combinadas, conducciones, nucleos, poblaciones, red_transporte, teselas
+from . import basal, cercanias, combinadas, conducciones, nucleos, poblaciones, red_transporte, relieve, teselas
 from .capas import CAPAS, CAPAS_ACTIVACION_EXTRA, CAPAS_METEO, COMBINADAS, ZOOM_MAX_METEO, tif
 from .fuentes import fuente
 from .incendio import combustible_cm, validacion
@@ -44,6 +44,7 @@ def main(argv=None):
     if not a.sin_teselas:
         print("3. Teselas de las capas de peligrosidad")
         teselas.main(["--zoom-max", str(a.zoom_max)])
+        print(f"  relieve para la vista en 3D (MDT 25 m del IGN): {relieve.construir().name}")
 
     print("4. Capas combinadas por grupo (nivel máximo de las naturales y de las tecnológicas)")
     for grupo in COMBINADAS:

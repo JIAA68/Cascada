@@ -103,6 +103,33 @@ function cambiarFondo(siOrto) {
 $("#fondo-mapa").onclick = () => cambiarFondo(false);
 $("#fondo-orto").onclick = () => cambiarFondo(true);
 
+// ----------------------------------------------------------------------------- vista en 3D
+// Relieve del MDT de 25 m del IGN (procesamiento/relieve.py, teselas Terrarium servidas en local), exagerado ×1,5 para
+// que se aprecie fuera de la sierra, con un sombreado suave. Apagada al arrancar, en los tres modos; al encenderla, el
+// mapa se inclina sobre el relieve y se puede girar e inclinar con el ratón (botón derecho o Ctrl + arrastrar). El
+// fuego, el humo, las zonas y las cartelas se pintan sobre el relieve
+const RELIEVE = { exageracion: 1.5, inclinacion: 60 };
+let vista3d = false;
+function prepararRelieve() {
+  const fuente = { type: "raster-dem", url: "pmtiles:///datos/relieve.pmtiles", tileSize: 256, encoding: "terrarium",
+    attribution: "Relieve: MDT 25 m © Instituto Geográfico Nacional" };
+  mapa.addSource("relieve", fuente);
+  mapa.addSource("relieve-sombra", { ...fuente });   // MapLibre recomienda una fuente aparte para el sombreado
+  const encima = mapa.getStyle().layers.find((l) => l.id.startsWith("capa-"));
+  mapa.addLayer({ id: "relieve-sombra", type: "hillshade", source: "relieve-sombra", layout: { visibility: "none" },
+    paint: { "hillshade-exaggeration": 0.35, "hillshade-shadow-color": "#3d3326", "hillshade-highlight-color": "#ffffff" } },
+    encima && encima.id);
+}
+function cambiarVista3d(si) {
+  vista3d = si;
+  mapa.setTerrain(si ? { source: "relieve", exaggeration: RELIEVE.exageracion } : null);
+  visible("relieve-sombra", si);
+  mapa.easeTo({ pitch: si ? RELIEVE.inclinacion : 0, bearing: si ? mapa.getBearing() : 0, duration: 1000 });
+  $("#vista-3d").classList.toggle("activo", si);
+  $("#vista-3d").setAttribute("aria-pressed", String(si));
+}
+$("#vista-3d").onclick = () => cambiarVista3d(!vista3d);
+
 // Casilla de nombres: todos los rótulos del mapa de golpe, los del mapa base (poblaciones, embalses, carreteras) y los
 // de los modos (lo afectado en la crisis, la conducción, las líneas de los trenes, las zonas de aviso). Estos últimos se
 // apagan con la opacidad, porque cada modo decide cuándo están visibles
@@ -455,6 +482,7 @@ mapa.on("load", () => {
   mapa.addLayer({ id: "celda-borde", type: "line", source: "celda", paint: { "line-color": "#1f2328", "line-width": 2 } });
   construirTerreno(mapa, "ign-pnoa");   // por debajo de todo
   construirCapas();
+  prepararRelieve();                    // sombreado del relieve, entre el mapa base y las capas
   construirReferencias(mapa);           // carreteras, tren y nombres, encima de las capas
   construirActivos();
   mapa.on("click", (ev) => {
