@@ -37,7 +37,7 @@ from .consecuencias import (DISTANCIA_ALCANZADO_M, activos_alcanzados, cascada_c
                             municipios_alcanzados, poblacion_por_celda)
 from .entradas import A_GEO, A_UTM, CRS, MADRID, combustible, fuente_combustible, municipio_de, municipios_en_ventana, \
     relieve, ventana_centrada, vientos_horarios
-from .humo import ALCANCE_MAX_KM, PASO_MIN, PERMANENCIA_H, SEMIANGULO_GRADOS, activos_bajo_humo, zonas_de_humo
+from .humo import ALCANCE_MAX_KM, AREA_MIN_HA, PASO_MIN, PERMANENCIA_H, SEMIANGULO_GRADOS, activos_bajo_humo, zonas_de_humo
 from .propagacion import Viento, tiempos_llegada
 from .vias import trenes_programados, vias_afectadas
 
@@ -190,7 +190,7 @@ def simular(lon: float, lat: float, hora: datetime, viento_manual: Viento | list
         "cascada": {"instalaciones_seveso": instalaciones, "conduccion": conduccion, "activos": der_lista, "sensibles": der_sens},
         "humo": {"activos": humo_lista, "sensibles": humo_sens,
                  "parametros": {"semiangulo_grados": SEMIANGULO_GRADOS, "permanencia_h": PERMANENCIA_H,
-                                "alcance_max_km": ALCANCE_MAX_KM, "paso_min": PASO_MIN},
+                                "alcance_max_km": ALCANCE_MAX_KM, "paso_min": PASO_MIN, "area_min_ha": AREA_MIN_HA},
                  # La misma geometría que marca los afectados, para que el visor la dibuje
                  "zonas": [{"minutos": m, "coords": np.round(np.column_stack(A_GEO.transform(*np.asarray(z.exterior.coords).T)), 5).tolist()}
                            for m, z in zonas_humo]},

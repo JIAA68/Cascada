@@ -158,6 +158,20 @@ def test_el_humo_no_pasa_del_alcance_maximo():
     assert z.bounds[2] == pytest.approx(500 + ALCANCE_MAX_KM * 1000)
 
 
+def test_un_foco_que_no_avanza_no_echa_humo():
+    from procesamiento.incendio.entradas import Ventana
+    t = np.full((81, 81), np.inf)
+    t[40, 40] = 0.0                       # solo arde la celda de la ignición
+    t[40, 41] = 600.0                     # y una más a las 10 h: 0,5 ha, por debajo de 1 ha
+    v = Ventana(0.0, 81 * CELDA, CELDA, 81, 81)
+    assert zonas_de_humo(t, v, [Viento(20, 270)], horizonte_min=1440) == []
+    t[41, 40:42] = 700.0                  # a las 11 h 40 min, 4 celdas: 1 ha
+    zonas = zonas_de_humo(t, v, [Viento(20, 270)], horizonte_min=1440)
+    assert zonas[0][0] == 700.0
+    # el alcance cuenta desde que hay humo: en el primer paso, 5 min a 20 km/h (unos 1,7 km), no 25 km
+    assert zonas[0][1].bounds[2] < 41 * CELDA + 2_000 + 1
+
+
 def test_zonas_de_humo_cada_paso_y_con_el_viento_de_su_hora():
     comb, pend, sub = rejilla(lado=81)
     t = tiempos_llegada(comb, pend, sub, CELDA, (40, 40), [Viento(20, 270)], VERANO, 120)
@@ -165,7 +179,7 @@ def test_zonas_de_humo_cada_paso_y_con_el_viento_de_su_hora():
     v = Ventana(0.0, 81 * CELDA, CELDA, 81, 81)
     zonas = zonas_de_humo(t, v, [Viento(20, 270), Viento(20, 0)], horizonte_min=120)
     minutos = [m for m, _ in zonas]
-    assert minutos[0] == 5.0 and minutos[-1] == 120.0 and len(minutos) == 24
+    assert minutos[0] == 10.0 and minutos[-1] == 120.0 and len(minutos) == 23   # 1 ha quemada a los 10 min
     primera_hora, segunda = dict(zonas)[55.0], dict(zonas)[65.0]
     assert primera_hora.centroid.x > 40 * CELDA          # viento del oeste: humo al este
     assert segunda.centroid.y < 40 * CELDA                # viento del norte: humo al sur

@@ -193,7 +193,8 @@ No hay una fuente abierta con la ubicación de las instalaciones Seveso ni con e
 Modelo geométrico. Cada 5 minutos, el humo sale del área quemada hasta ese momento y se desplaza viento abajo con el viento de esa hora, abriéndose en un cono. La zona de humo es la envolvente convexa del área quemada y de esa misma área desplazada y ensanchada a cada lado. Es una sola geometría: la calcula el servidor, el visor la dibuja y con ella se marcan los centros, carreteras, vías y estaciones bajo el humo.
 
 - Semiángulo del cono: 20°.
-- Alcance: velocidad del viento × tiempo transcurrido desde la ignición, hasta 2 horas de permanencia, con un máximo de 25 km más allá del área quemada.
+- Umbral: solo hay humo cuando han ardido al menos 1 ha (4 celdas de 50 m). Un foco que no avanza (por ejemplo, con la humedad real de un día de invierno) no echa humo.
+- Alcance: velocidad del viento × tiempo transcurrido desde que hay humo, hasta 2 horas de permanencia, con un máximo de 25 km más allá del área quemada.
 - Sin viento, el humo se queda en un radio de 500 m alrededor del fuego.
 
 Parámetros provisionales. **No es un modelo de dispersión:** no tiene en cuenta la altura de la columna, la estabilidad atmosférica, el relieve ni las concentraciones. Señala qué activos pueden quedar a sotavento.

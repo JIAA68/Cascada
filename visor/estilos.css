@@ -136,6 +136,35 @@ h4 { font-size: 13px; margin: 10px 0 4px; }
 #datos-inicio tr.familia td { font-weight: 600; padding-top: 4px; }
 #datos-inicio tr.subtipo td:first-child { padding-left: 18px; }
 #datos-inicio tr.total td { font-weight: 600; border-top: 1px solid #eee; padding-top: 3px; }
+/* Portada: a pantalla completa sobre el mapa en gris, sin la cabecera, el pie, el panel derecho, el buscador ni los controles
+   del mapa (vuelven al cerrarla). Qué hace Cascada, cuatro cifras grandes y las tres entradas; el detalle, plegado al pie */
+body.con-portada { grid-template-rows: 1fr; }
+body.con-portada header, body.con-portada footer, body.con-portada #panel, body.con-portada #plegar-panel, body.con-portada #buscador,
+body.con-portada .maplibregl-ctrl-top-right, body.con-portada .maplibregl-ctrl-bottom-left { display: none; }
+body.con-portada main { grid-template-columns: 1fr; }
+body.con-portada .maplibregl-canvas { filter: grayscale(1) brightness(1.04) contrast(.9); }
+#datos-inicio { width: min(1180px, calc(100% - 64px)); max-height: calc(100% - 48px); padding: 40px 52px 0; border-radius: 12px;
+  font-size: 15px; box-shadow: 0 12px 48px rgba(0,0,0,.3); }
+#datos-inicio #datos-inicio-titulo { font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -.03em; margin: 0 0 20px; }
+#datos-inicio .lema { font-size: 20px; line-height: 1.5; margin: 0 0 32px; }
+.portada-cifras { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin: 0 0 28px; }
+.portada-cifras div { background: var(--fondo); border-radius: 8px; padding: 18px 20px; }
+.portada-cifras strong { display: block; font-size: 48px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.portada-cifras span { display: block; color: var(--suave); font-size: 15px; margin-top: 6px; }
+.portada-entradas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 0 0 24px; }
+.portada-entradas button { font: inherit; text-align: left; padding: 20px 22px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--borde); background: #fff; color: var(--texto); }
+.portada-entradas button strong { display: block; font-size: 21px; margin-bottom: 6px; }
+.portada-entradas button span { display: block; font-size: 15px; color: var(--suave); line-height: 1.45; }
+.portada-entradas button.principal { background: #1f2328; border-color: #1f2328; color: #fff; }
+.portada-entradas button.principal span { color: #c9ced4; }
+.portada-entradas button:hover { border-color: #1f2328; }
+.portada-entradas button.principal:hover { background: #3a3f45; }
+.portada-detalle { border-top: 1px solid #eee; padding: 8px 0 4px; }
+.portada-detalle > summary { cursor: pointer; color: var(--suave); }
+.portada-detalle[open] > summary { margin-bottom: 6px; }
+.portada-detalle .ayuda-inicio, .portada-detalle .columnas { font-size: 13px; }
+@media (max-width: 900px) { .portada-cifras { grid-template-columns: repeat(2, 1fr); } .portada-entradas { grid-template-columns: 1fr; } }
 #movilidad-leyenda div + div { margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; }
 /* El botón, siempre a la vista aunque haya que desplazar el contenido */
 #datos-inicio .acciones { position: sticky; bottom: 0; margin: 0 -18px; padding: 10px 18px 14px; text-align: right;

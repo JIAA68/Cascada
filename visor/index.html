@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="estilos.css">
 </head>
-<body>
+<body class="con-portada">
   <header>
     <h1>Cascada</h1>
     <span class="subtitulo">Riesgos sobre la población con menor capacidad de autoprotección · Comunidad de Madrid</span>
@@ -39,10 +39,29 @@
           autocomplete="off" role="combobox" aria-expanded="false" aria-controls="buscador-lista">
         <ul id="buscador-lista" role="listbox" hidden></ul>
       </div>
-      <!-- Resumen de los datos al arrancar: centrado sobre el mapa, se cierra con su botón
-           y no vuelve a abrirse. Lleva también la leyenda de trenes y tráfico, que antes flotaba arriba a la izquierda -->
+      <!-- Portada al arrancar: centrada sobre el mapa, con qué hace Cascada, las cifras de los datos y las tres entradas.
+           Se cierra con una entrada o con su botón y no vuelve a abrirse. El detalle de los datos y la leyenda de trenes
+           y tráfico van plegados al pie -->
       <div id="datos-inicio" role="dialog" aria-labelledby="datos-inicio-titulo">
-        <h2 id="datos-inicio-titulo">Datos del visor</h2>
+        <h2 id="datos-inicio-titulo">Cascada</h2>
+        <p class="lema">Cruza los riesgos del Catálogo de Riesgos Potenciales de la Comunidad de Madrid con los colegios, hospitales y centros sociales donde está la población que menos puede protegerse por sí misma. Ante un incendio o la rotura de una presa, simula cómo avanza la amenaza y a qué hora llega a cada centro.</p>
+        <div class="portada-cifras">
+          <div><strong id="cifra-centros">…</strong><span>centros educativos, sanitarios y sociales</span></div>
+          <div><strong id="cifra-habitantes">…</strong><span>millones de habitantes, en celdas de 1 km</span></div>
+          <div><strong id="cifra-capas">…</strong><span>capas de peligrosidad del catálogo</span></div>
+          <div><strong id="cifra-presas">…</strong><span>presas con su zona inundable</span></div>
+          <div><strong id="cifra-trenes">…</strong><span>trenes de viajeros circulando ahora, y el tráfico, en tiempo real</span></div>
+        </div>
+        <div class="portada-entradas">
+          <button id="entrada-incendio" type="button" class="principal"><strong>Simular un incendio</strong>
+            <span>Sitúa la alerta en el mapa o elige un foco de satélite. Avance en 24 horas con el viento de AEMET.</span></button>
+          <button id="entrada-presa" type="button" class="principal"><strong>Simular la rotura de una presa</strong>
+            <span>Elige la presa. Llegada del agua aguas abajo, hora a hora.</span></button>
+          <button id="entrada-basal" type="button"><strong>Explorar el riesgo basal</strong>
+            <span>Riesgos de cada celda de 1 km y de cada centro, con el peligro del catálogo.</span></button>
+        </div>
+        <details class="portada-detalle">
+        <summary>Datos del visor y fuentes</summary>
         <p class="ayuda-inicio">Haz clic en el mapa para ver los riesgos de la <strong>celda de 1 km</strong>, o en un activo para ver los suyos. Enciende capas y activos en el panel derecho.</p>
         <div class="columnas">
           <div><section id="datos-activos"><p class="meta">Cargando los activos…</p></section></div>
@@ -52,6 +71,7 @@
             <section id="movilidad-leyenda" hidden></section>
           </div>
         </div>
+        </details>
         <p class="acciones"><button id="datos-inicio-cerrar" type="button">Cerrar</button></p>
       </div>
       <div id="cronologia-mapa" hidden></div>

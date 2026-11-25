@@ -276,9 +276,36 @@ function construirActivos() {
 // ----------------------------------------------------------------------------- resumen al arrancar
 // Ventana centrada con los datos del visor: activos por familia y subtipo, capas de
 // peligrosidad, población y, debajo, trenes y tráfico en tiempo real (movilidad.js). Se cierra con su botón y no vuelve.
-$("#datos-inicio-cerrar").onclick = () => $("#datos-inicio").remove();
+// Al cerrarla vuelven la cabecera, el panel, el buscador, los controles y el color del mapa, que cambia de tamaño
+function cerrarPortada() {
+  $("#datos-inicio").remove();
+  document.body.classList.remove("con-portada");
+  mapa.resize();
+}
+$("#datos-inicio-cerrar").onclick = cerrarPortada;
+
+// Entradas de la portada: cierran la portada y abren el modo con el panel derecho a la vista. Las de la crisis eligen la
+// amenaza y dejan la alerta sin poner (el punto o la presa los elige quien la usa)
+function entrar(modoNuevo, amenaza) {
+  plegarPanel(false);
+  cerrarPortada();
+  if (modoNuevo === "crisis") { $("#modo-crisis").click(); $(`#crisis-${amenaza}`).click(); }
+  else $("#modo-basal").click();
+}
+$("#entrada-incendio").onclick = () => entrar("crisis", "incendio");
+$("#entrada-presa").onclick = () => entrar("crisis", "presa");
+$("#entrada-basal").onclick = () => entrar("basal");
+
+// Cifras de la portada: centros con ubicación, habitantes del censo, capas de peligrosidad, presas y trenes en tiempo real
+function cifra(id, texto) { const c = $(`#${id}`); if (c) c.textContent = texto; }
+cifra("cifra-capas", String(CAPAS.length));
+consultar("/api/presas").then((l) => cifra("cifra-presas", String(l.length))).catch(() => cifra("cifra-presas", "–"));
+// Trenes de viajeros de Renfe en este momento (GTFS-Realtime); sin conexión, no hay dato
+if (SIN_CONEXION) cifra("cifra-trenes", "–");
+else consultar("/api/trenes").then((d) => cifra("cifra-trenes", d.error ? "–" : numero(d.trenes.length))).catch(() => cifra("cifra-trenes", "–"));
 
 function resumenActivos() {
+  cifra("cifra-centros", numero(activosTodos.features.length));
   const caja = $("#datos-activos");
   if (!caja) return;
   const n = {};
@@ -306,9 +333,10 @@ async function resumenPoblacion() {
   const caja = $("#datos-poblacion");
   let d;
   try { d = await consultar("/api/resumen"); }
-  catch (e) { if (caja) caja.innerHTML = `<h3>Población</h3><p class="error">${html(e.message)}</p>`; return; }
+  catch (e) { if (caja) caja.innerHTML = `<h3>Población</h3><p class="error">${html(e.message)}</p>`; cifra("cifra-habitantes", "–"); return; }
   if (!$("#datos-poblacion")) return;   // ya se ha cerrado
   const p = d.poblacion;
+  cifra("cifra-habitantes", `${(p.total / 1e6).toLocaleString("es-ES", { maximumFractionDigits: 2 })}`);
   caja.innerHTML = `<h3>Población</h3><p><strong>${numero(p.total)}</strong> habitantes, ${numero(p.menores_16)} menores de 16 y ` +
     `${numero(p.mayores_64)} mayores de 64, en las ${numero(d.celdas)} celdas de 1 km que cubren la Comunidad.</p><p class="meta">INE, Censo 2021 en la rejilla europea de 1 km.</p>`;
 }

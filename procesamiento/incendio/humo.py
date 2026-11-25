@@ -2,7 +2,8 @@
 
 El humo sale del área quemada hasta ese momento y se desplaza viento abajo con el viento de
 esa hora, abriéndose en un cono:
-- alcance = velocidad del viento × tiempo transcurrido, hasta 2 h de permanencia, con un máximo
+- solo cuando han ardido al menos 1 ha (AREA_MIN_HA): un foco que no avanza no echa humo;
+- alcance = velocidad del viento × tiempo desde que hay humo, hasta 2 h de permanencia, con un máximo
   de 25 km más allá del área quemada;
 - apertura = semiángulo fijo a cada lado del eje del viento.
 La zona de humo es la envolvente convexa del área quemada y de esa misma área desplazada viento
@@ -26,6 +27,7 @@ PERMANENCIA_H = 2.0
 ALCANCE_MAX_KM = 25.0
 RADIO_CALMA_M = 500
 PASO_MIN = 5
+AREA_MIN_HA = 1.0
 
 
 def puntos_quemados(llegada: np.ndarray, ventana, minutos: float) -> np.ndarray | None:
@@ -62,14 +64,18 @@ def zona_humo(quemado, velocidad_kmh: float, desde: float, horas_desde_ignicion:
 
 def zonas_de_humo(llegada: np.ndarray, ventana, vientos, horizonte_min: float = 24 * 60,
                   paso_min: float = PASO_MIN) -> list[tuple[float, shapely.Geometry]]:
-    """(minutos, zona de humo en EPSG:25830) cada paso_min minutos desde el primer paso con humo."""
-    salida = []
+    """(minutos, zona de humo en EPSG:25830) cada paso_min minutos desde el primer paso con humo: el primero en que
+    han ardido al menos AREA_MIN_HA. El alcance cuenta desde ese paso."""
+    salida, inicio = [], None
+    celdas_min = AREA_MIN_HA * 10_000 / ventana.celda ** 2
     for m in np.arange(paso_min, horizonte_min + 1e-9, paso_min):
+        if inicio is None:
+            if np.count_nonzero(llegada <= m) < celdas_min:
+                continue
+            inicio = m - paso_min
         puntos = puntos_quemados(llegada, ventana, m)
-        if puntos is None:
-            continue
         w = vientos[min(int(m // 60), len(vientos) - 1)]
-        zona = zona_humo(puntos, w.velocidad_kmh, w.desde, m / 60)
+        zona = zona_humo(puntos, w.velocidad_kmh, w.desde, (m - inicio) / 60)
         if zona is not None:
             salida.append((float(m), zona))
     return salida
