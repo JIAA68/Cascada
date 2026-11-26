@@ -8,8 +8,8 @@ Es un demostrador: se ejecuta en local, sin usuarios ni credenciales, y todo lo 
 
 **Vídeo y presentación:**
 
-- [Simulación de un incendio](https://youtu.be/hQ1-rvie1xQ) (vídeo en YouTube). Ignición junto a Torrejón de la Calzada un día de julio a las 15:00, con viento del oeste a 20 km/h, reproducida minuto a minuto durante 24 horas, con rótulos en los momentos clave.
-- [Presentación ejecutiva](presentacion/cascada_presentacion.pdf) (PDF, 7 diapositivas).
+- [Demostración](https://youtu.be/g9kXkLE636I) (vídeo en YouTube, 3 min 30 s). Incendio junto a Torrejón de la Calzada un día de julio a las 15:00, con viento del oeste a 20 km/h, reproducido minuto a minuto durante 24 horas; vista en 3D sobre el relieve, y rotura de la presa de Santillana. Con rótulos en los momentos clave.
+- [Presentación ejecutiva](presentacion/cascada_presentacion.pdf) (PDF, 6 diapositivas).
 
 ## Qué hace
 
